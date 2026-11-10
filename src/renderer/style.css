@@ -1,0 +1,15 @@
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Georgia, serif;
+  background: #d5d7dc;
+  color: #141a30;
+}
+
+.app-shell {
+  padding: 2rem;
+}
