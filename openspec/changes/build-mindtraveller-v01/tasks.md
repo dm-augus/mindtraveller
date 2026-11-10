@@ -4,7 +4,7 @@
 
 - [x] 1.1 Scaffold Electron Forge, TypeScript, React renderer, and Windows build scripts; verify the app opens in development and `typecheck` completes.
 - [x] 1.2 Add a sandboxed window, restrictive content security policy, and named preload APIs with validated IPC inputs and sender; verify renderer code cannot access Node or unrestricted IPC.
-- [ ] 1.3 Define shared adventure, character, choice, check, provider, and pending-turn data types; verify typecheck accepts representative valid states and rejects invalid fixtures.
+- [x] 1.3 Define shared adventure, character, choice, check, provider, and pending-turn data types; verify typecheck accepts representative valid states and rejects invalid fixtures.
 
 ## 2. Character and D100 rules
 

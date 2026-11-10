@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { AppInfo } from '../shared/types';
 
 const rendererPath = path.join(__dirname, '../renderer/index.html');
 const rendererUrl = pathToFileURL(rendererPath).href;
@@ -24,7 +25,8 @@ function assertTrustedRequest(event: IpcMainInvokeEvent, args: unknown[]): void 
 
 ipcMain.handle('app:get-info', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
-  return { version: app.getVersion() };
+  const info: AppInfo = { version: app.getVersion() };
+  return info;
 });
 
 ipcMain.handle('app:quit', (event, ...args: unknown[]) => {
