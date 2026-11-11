@@ -14,10 +14,10 @@
 
 ## 3. Durable local state
 
-- [ ] 3.1 Implement versioned single-adventure storage with a temporary write and last-known-good recovery; verify tests cover normal save/load, corrupted active data, and failed writes.
-- [ ] 3.2 Persist completed turns and pending states, including selected action and a completed roll; verify restart tests recover each state without duplicating a choice or rerolling.
-- [ ] 3.3 Store provider/model settings apart from adventures and protect the OpenAI key with Windows user-bound storage; verify tests confirm adventure files and logs contain no key and Settings cannot read back the full key.
-- [ ] 3.4 Implement confirmed New Story replacement and cancellation against the saved adventure; verify both confirmation paths preserve or replace the correct state.
+- [x] 3.1 Implement versioned single-adventure storage with a temporary write and last-known-good recovery; verify tests cover normal save/load, corrupted active data, and failed writes.
+- [x] 3.2 Persist completed turns and pending states, including selected action and a completed roll; verify restart tests recover each state without duplicating a choice or rerolling.
+- [x] 3.3 Store provider/model settings apart from adventures and protect the OpenAI key with Windows user-bound storage; verify tests confirm adventure files and logs contain no key and Settings cannot read back the full key.
+- [x] 3.4 Implement confirmed New Story replacement and cancellation against the saved adventure; verify both confirmation paths preserve or replace the correct state.
 
 ## 4. Provider communication
 

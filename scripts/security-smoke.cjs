@@ -20,7 +20,10 @@ app.on('browser-window-created', (_event, window) => {
         result.nodeProcess !== 'undefined' ||
         result.nodeRequire !== 'undefined' ||
         result.rawIpc !== 'undefined' ||
-        JSON.stringify(result.bridgeKeys) !== JSON.stringify(['getAppInfo', 'quit']) ||
+        JSON.stringify(result.bridgeKeys) !== JSON.stringify([
+          'getAppInfo', 'getProviderSettings', 'quit', 'requestNewStory',
+          'resolveNewStory', 'saveProviderConfiguration', 'setOpenAiKey'
+        ]) ||
         result.version !== app.getVersion() ||
         !result.csp?.includes("default-src 'none'") ||
         !result.csp?.includes("connect-src 'none'")

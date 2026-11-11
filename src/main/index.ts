@@ -1,13 +1,36 @@
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { AppInfo } from '../shared/types';
+import { AdventureStore } from './adventure-storage';
+import { NewStoryController } from './new-story';
+import { ProviderSettingsStore } from './provider-settings';
 
 const rendererPath = path.join(__dirname, '../renderer/index.html');
 const rendererUrl = pathToFileURL(rendererPath).href;
 const trustedWindowIds = new Set<number>();
+let providerSettingsStore: ProviderSettingsStore | null = null;
+let activeAdventureStore: AdventureStore | null = null;
+let newStoryController: NewStoryController | null = null;
 
-function assertTrustedRequest(event: IpcMainInvokeEvent, args: unknown[]): void {
+function adventureStore(): AdventureStore {
+  if (activeAdventureStore === null) activeAdventureStore = new AdventureStore(app.getPath('userData'));
+  return activeAdventureStore;
+}
+
+function newStory(): NewStoryController {
+  if (newStoryController === null) newStoryController = new NewStoryController(adventureStore());
+  return newStoryController;
+}
+
+function settingsStore(): ProviderSettingsStore {
+  if (providerSettingsStore === null) {
+    providerSettingsStore = new ProviderSettingsStore(app.getPath('userData'), safeStorage);
+  }
+  return providerSettingsStore;
+}
+
+function assertTrustedRequest(event: IpcMainInvokeEvent, args: unknown[], expectedArguments = 0): void {
   const sourceWindow = BrowserWindow.fromWebContents(event.sender);
   if (
     !sourceWindow ||
@@ -18,7 +41,7 @@ function assertTrustedRequest(event: IpcMainInvokeEvent, args: unknown[]): void 
   ) {
     throw new Error('Untrusted IPC sender');
   }
-  if (args.length !== 0) {
+  if (args.length !== expectedArguments) {
     throw new TypeError('Unexpected IPC arguments');
   }
 }
@@ -32,6 +55,31 @@ ipcMain.handle('app:get-info', (event, ...args: unknown[]) => {
 ipcMain.handle('app:quit', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   setImmediate(() => app.quit());
+});
+
+ipcMain.handle('settings:get', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args);
+  return settingsStore().getPublicSettings();
+});
+
+ipcMain.handle('settings:save', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 1);
+  return settingsStore().saveConfiguration(args[0]);
+});
+
+ipcMain.handle('settings:set-openai-key', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 2);
+  return settingsStore().setOpenAiKey(args[0], args[1]);
+});
+
+ipcMain.handle('story:new-request', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args);
+  return newStory().request();
+});
+
+ipcMain.handle('story:new-resolve', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 2);
+  return newStory().resolve(args[0], args[1]);
 });
 
 function createWindow(): void {

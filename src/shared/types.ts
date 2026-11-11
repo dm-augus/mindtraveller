@@ -66,9 +66,9 @@ export type PendingTurn =
 
 export type AdventurePhase =
   | { kind: 'ready' }
-  | { kind: 'pending-opening' }
+  | { kind: 'pending-opening'; turnId: string }
   | PendingTurn
-  | { kind: 'pending-summary'; chapterNumber: number };
+  | { kind: 'pending-summary'; turnId: string; chapterNumber: number };
 
 export interface Adventure {
   schemaVersion: 1;
@@ -83,14 +83,17 @@ export interface Adventure {
   updatedAt: string;
 }
 
+export type NewStoryRequest =
+  | { kind: 'start-creation' }
+  | { kind: 'confirmation-required'; confirmationId: string; adventureId: string };
+
+export type NewStoryResolution =
+  | { kind: 'start-creation' }
+  | { kind: 'continue-adventure'; adventure: Adventure };
+
 export type ProviderKind = 'ollama' | 'openai';
 
-export interface ModelOption {
-  id: string;
-  label: string;
-}
-
-export interface ProviderSettings {
+export interface ProviderConfiguration {
   activeProvider: ProviderKind;
   ollama: {
     serverAddress: string;
@@ -98,8 +101,16 @@ export interface ProviderSettings {
   };
   openai: {
     modelId: string | null;
-    hasSavedKey: boolean;
   };
+}
+
+export interface ModelOption {
+  id: string;
+  label: string;
+}
+
+export interface ProviderSettings extends ProviderConfiguration {
+  openai: ProviderConfiguration['openai'] & { hasSavedKey: boolean };
 }
 
 export interface AppInfo {
