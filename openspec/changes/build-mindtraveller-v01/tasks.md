@@ -41,7 +41,7 @@
 
 ## 7. Desktop screens
 
-- [ ] 7.1 Build the retro shell, sidebar, story scroll area, decision panel, status bar, and Quit action using the prototype as reference; verify the screens render in the Windows app at normal and smaller window sizes.
+- [ ] 7.1 Build the retro shell, sidebar, story scroll area, decision panel, status bar, and Quit action using the prototype and `src/assets/reference/` as visual references and suitable graphics from `src/assets/branding/`, `src/assets/icons/`, and `src/assets/ui/`; keep labels and controls live, and verify the screens and bundled images render in the Windows app at normal and smaller window sizes.
 - [ ] 7.2 Build New Story setup for theme, allocation method and values, name, gender, and Good/Neutral/Bad Nature; verify invalid allocations cannot advance and a valid setup starts generation.
 - [ ] 7.3 Build story and choice interaction with pending, retry, and visible difficulty/attribute/roll/threshold/outcome states; verify the checked and no-check flows with a stub provider.
 - [ ] 7.4 Build Rules and Settings views, including character details, model selection, protected key entry, and provider errors; verify navigation preserves the active story and no full saved key is displayed.
@@ -50,4 +50,4 @@
 ## 8. Integrated Windows release check
 
 - [ ] 8.1 Run typecheck and automated tests, then exercise character creation, both provider adapters with stubs, a checked turn, retry, summary, save/restore, and replacement in the running app; verify all paths complete without duplicate decisions or rolls.
-- [ ] 8.2 Create a Windows installer with Electron Forge and smoke-test the installed app's launch, local save location, restoration, and Quit behavior; verify the package is usable without a separately hosted server.
+- [ ] 8.2 Create a Windows installer with Electron Forge and smoke-test the installed app's launch, bundled UI assets, local save location, restoration, and Quit behavior; verify the package is usable without a separately hosted server.

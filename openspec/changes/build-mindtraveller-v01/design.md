@@ -27,6 +27,8 @@ Use TypeScript in an Electron main process, a sandboxed renderer, and a narrow p
 
 For the renderer, use React with TypeScript and CSS to manage the multi-screen story, settings, rules, and creation flows. Use the reference PNG for layout and visual direction; recreate controls as real UI elements rather than displaying the mockup as a bitmap. Alternative: plain DOM code would reduce dependencies but make the screen and pending-turn state harder to maintain.
 
+The supplied asset pack is stored in `src/assets/`: `branding/` contains the logo and dice artwork, `icons/` contains menu and status icons, `ui/` contains extracted controls and reusable textures, and `reference/` contains the original screen and a style guide. Bundle suitable images with the renderer and use the reference images only as visual guidance. Some extracted images contain fixed sample text or drawn window controls, and the transparent icon variants have approximate background removal. Keep interactive controls, story text, choices, status, and version as live UI so they remain accurate and readable. The pack does not supply font files.
+
 ### 2. Domain modules and provider contract
 
 Keep character validation, action resolution, turn orchestration, context construction, summarization, persistence, and provider adapters separate from Electron UI components. Provider adapters expose a common set of operations: discover models where supported, generate an opening, assess/continue an action, narrate a resolved check, and summarize memory. Responses use validated structured data for check classification and choices. Invalid or incomplete output is retried a bounded number of times, then surfaced as a recoverable error.

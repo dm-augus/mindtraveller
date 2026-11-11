@@ -15,10 +15,15 @@ The application SHALL run as a Windows desktop application and open its main gam
 
 ### Requirement: Retro game layout
 The main window SHALL present a sidebar, scrollable story area, decision area, and bottom status bar in a retro desktop style informed by `temp/reference_prototype_1.png`.
+The renderer SHALL reuse suitable supplied graphics from `src/assets/branding/`, `src/assets/icons/`, and `src/assets/ui/`. Images in `src/assets/reference/` SHALL guide the visual design rather than replace live story text, controls, or status information.
 
 #### Scenario: Active adventure view
 - **WHEN** an adventure has a current narrative segment and available choices
 - **THEN** the story area shows the narrative, the decision area shows the choices, and the sidebar and status bar remain available
+
+#### Scenario: Supplied graphics in the desktop shell
+- **WHEN** the main game window renders
+- **THEN** suitable bundled branding, icon, and UI graphics appear while labels, choices, and status remain live and readable
 
 ### Requirement: Primary navigation
 The sidebar SHALL provide New Story, Rules, Settings, and Quit actions, and the player SHALL be able to return to the active story from Rules or Settings.
