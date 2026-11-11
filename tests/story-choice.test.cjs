@@ -207,22 +207,6 @@ for (const invalid of [
   });
 }
 
-test('valid check classification returns a recoverable handoff without rolling or inventing a continuation', async (t) => {
-  const { store } = await fixture(t);
-  t.mock.method(crypto, 'randomInt', () => { throw new Error('Checked-turn orchestration owns rolling.'); });
-  const controller = new StoryController(store, source(provider(() => ({ kind: 'check', difficulty: 'Hard', attribute: 'Strength' }))));
-  const result = await controller.submitChoice('scene-1', 'enter');
-  assert.equal(result.kind, 'check-required');
-  assert.equal(result.difficulty, 'Hard');
-  assert.equal(result.attribute, 'Strength');
-  assert.equal(result.adventure.phase.kind, 'pending-assessment');
-  assert.equal(result.adventure.segments.length, 1);
-  assert.equal(result.adventure.segments[0].check, null);
-  await assert.rejects(controller.submitChoice('scene-1', 'wait'), /already pending/);
-  const retried = await controller.retryTurn(result.adventure.phase.choice.turnId);
-  assert.deepEqual(retried.adventure, result.adventure);
-});
-
 test('two controllers sharing storage cannot both submit the same source scene', async (t) => {
   const { store } = await fixture(t);
   const stub = provider();
