@@ -1,6 +1,7 @@
 import type { CharacterSetup } from '../shared/character-rules';
 import type {
   Adventure,
+  ChoiceTurnResult,
   AppInfo,
   NewStoryRequest,
   NewStoryResolution,
@@ -23,6 +24,8 @@ declare global {
       startOpening(setup: CharacterSetup): Promise<Adventure>;
       retryOpening(): Promise<Adventure>;
       restoreAdventure(): Promise<Adventure | null>;
+      submitChoice(segmentId: string, choiceId: string): Promise<ChoiceTurnResult>;
+      retryTurn(turnId: string): Promise<ChoiceTurnResult>;
     };
   }
 }

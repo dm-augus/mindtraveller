@@ -14,6 +14,10 @@ app.on('browser-window-created', (_event, window) => {
         rawIpc: typeof window.ipcRenderer,
         bridgeKeys: Object.keys(window.mindtraveller ?? {}).sort(),
         version: (await window.mindtraveller.getAppInfo()).version,
+        invalidChoiceRejected: await window.mindtraveller.submitChoice(null, 'wait')
+          .then(() => false, (error) => /segment ID and choice ID/.test(error.message)),
+        invalidTurnRejected: await window.mindtraveller.retryTurn(null)
+          .then(() => false, (error) => /pending turn ID/.test(error.message)),
         csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content
       }))()`);
       if (
@@ -22,10 +26,12 @@ app.on('browser-window-created', (_event, window) => {
         result.rawIpc !== 'undefined' ||
         JSON.stringify(result.bridgeKeys) !== JSON.stringify([
           'getAppInfo', 'getProviderSettings', 'quit', 'requestNewStory',
-          'resolveNewStory', 'restoreAdventure', 'retryOpening', 'saveProviderConfiguration',
-          'setOpenAiKey', 'startOpening'
+          'resolveNewStory', 'restoreAdventure', 'retryOpening', 'retryTurn', 'saveProviderConfiguration',
+          'setOpenAiKey', 'startOpening', 'submitChoice'
         ]) ||
         result.version !== app.getVersion() ||
+        !result.invalidChoiceRejected ||
+        !result.invalidTurnRejected ||
         !result.csp?.includes("default-src 'none'") ||
         !result.csp?.includes("connect-src 'none'")
       ) {

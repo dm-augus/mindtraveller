@@ -83,6 +83,10 @@ export interface Adventure {
   updatedAt: string;
 }
 
+export type ChoiceTurnResult =
+  | { kind: 'continued'; adventure: Adventure }
+  | { kind: 'check-required'; adventure: Adventure; difficulty: DifficultyClass; attribute: AttributeName };
+
 export type NewStoryRequest =
   | { kind: 'start-creation' }
   | { kind: 'confirmation-required'; confirmationId: string; adventureId: string };

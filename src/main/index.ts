@@ -107,6 +107,16 @@ ipcMain.handle('story:restore', (event, ...args: unknown[]) => {
   return story().restore();
 });
 
+ipcMain.handle('story:submit-choice', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 2);
+  return story().submitChoice(args[0], args[1]);
+});
+
+ipcMain.handle('story:retry-turn', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 1);
+  return story().retryTurn(args[0]);
+});
+
 function createWindow(): void {
   const window = new BrowserWindow({
     width: 1200,

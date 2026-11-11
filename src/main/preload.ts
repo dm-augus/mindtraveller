@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { CharacterSetup } from '../shared/character-rules';
 import type {
   Adventure,
+  ChoiceTurnResult,
   AppInfo,
   NewStoryRequest,
   NewStoryResolution,
@@ -22,5 +23,8 @@ contextBridge.exposeInMainWorld('mindtraveller', {
     ipcRenderer.invoke('story:new-resolve', confirmationId, decision),
   startOpening: (setup: CharacterSetup): Promise<Adventure> => ipcRenderer.invoke('story:start-opening', setup),
   retryOpening: (): Promise<Adventure> => ipcRenderer.invoke('story:retry-opening'),
-  restoreAdventure: (): Promise<Adventure | null> => ipcRenderer.invoke('story:restore')
+  restoreAdventure: (): Promise<Adventure | null> => ipcRenderer.invoke('story:restore'),
+  submitChoice: (segmentId: string, choiceId: string): Promise<ChoiceTurnResult> =>
+    ipcRenderer.invoke('story:submit-choice', segmentId, choiceId),
+  retryTurn: (turnId: string): Promise<ChoiceTurnResult> => ipcRenderer.invoke('story:retry-turn', turnId)
 });
