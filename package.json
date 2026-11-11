@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "test": "npm run build:main && node --test",
     "security:smoke": "npm run build && set ELECTRON_RUN_AS_NODE=&& electron scripts/security-smoke.cjs",
+    "ui:smoke": "npm run build && node scripts/run-shell-smoke.cjs",
     "start": "npm run build && electron-forge start",
     "package": "npm run build && electron-forge package",
     "make": "npm run build && electron-forge make"

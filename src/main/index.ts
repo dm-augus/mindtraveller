@@ -124,6 +124,7 @@ function createWindow(): void {
     minWidth: 760,
     minHeight: 520,
     title: 'Mindtraveller',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -133,6 +134,7 @@ function createWindow(): void {
     }
   });
 
+  window.removeMenu();
   trustedWindowIds.add(window.id);
   window.on('closed', () => trustedWindowIds.delete(window.id));
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
