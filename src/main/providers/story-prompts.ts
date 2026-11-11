@@ -67,7 +67,7 @@ export function summaryMessages(request: SummaryRequest): ProviderMessage[] {
   return [
     {
       role: 'system',
-      content: `${JSON_INSTRUCTION} Summarize the supplied story context. Preserve significant choices, check outcomes, characters, relationships, world facts, and unresolved goals. Return text, keyFacts, and unresolvedThreads as arrays of strings.`
+      content: `${JSON_INSTRUCTION} Summarize the supplied story context. Preserve significant choices, check outcomes, characters, relationships, world facts, and unresolved goals. When updating a prior summary, retain still-relevant facts and unresolved threads; resolve a thread only when the source events establish its resolution. Return text as a string, and keyFacts and unresolvedThreads as arrays of strings.`
     },
     {
       role: 'user',

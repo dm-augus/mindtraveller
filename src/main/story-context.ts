@@ -21,7 +21,7 @@ export class StoryContextBudgetError extends Error {
   }
 }
 
-function selectedChoice(segment: StorySegment): Choice | null {
+export function selectedChoice(segment: StorySegment): Choice | null {
   if (segment.selectedChoiceId === null) return null;
   const choice = segment.choices.find((available) => available.id === segment.selectedChoiceId);
   if (!choice) throw new TypeError('A selected story choice is missing from its source segment.');

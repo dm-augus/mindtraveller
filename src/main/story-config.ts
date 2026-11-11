@@ -9,7 +9,7 @@ export interface StoryConfiguration {
   contextBudgetTokens: number;
   /** Unsummarized chapter detail can trigger a summary before chapterLength. */
   chapterSummaryThresholdTokens: number;
-  /** Accumulated memory size can trigger a global update between chapter boundaries. */
+  /** Accumulated unsummarized detail can trigger a global update between chapter boundaries. */
   globalSummaryThresholdTokens: number;
 }
 

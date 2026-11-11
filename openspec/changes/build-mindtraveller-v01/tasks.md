@@ -29,7 +29,7 @@
 ## 5. Story memory
 
 - [x] 5.1 Implement configurable paragraph/choice targets, chapter length, recent-event window, context budget, and summary thresholds; verify the context builder includes the required rules, character, theme, summaries, recent events, and latest decision.
-- [ ] 5.2 Implement chapter and global summary updates while retaining source events until commit; verify tests cover chapter boundaries, preservation of key facts, and failure without data loss.
+- [x] 5.2 Implement chapter and global summary updates while retaining source events until commit; verify tests cover chapter boundaries, preservation of key facts, and failure without data loss.
 - [ ] 5.3 Implement bounded context selection for long adventures; verify tests show old detail is summarized or omitted while core rules, objectives, and recent events remain.
 
 ## 6. Turn orchestration
