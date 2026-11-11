@@ -180,7 +180,9 @@ test('request builders reject phases that lack a saved decision or check', () =>
 });
 
 test('context budget accepts its boundary and rejects oversized context without changing saved data', () => {
-  const saved = freeze(adventure());
+  const saved = adventure();
+  saved.chapterSummaries = [];
+  freeze(saved);
   const before = structuredClone(saved);
   const text = new StoryContextBuilder().build(saved);
   const tokens = estimateContextTokens(text);

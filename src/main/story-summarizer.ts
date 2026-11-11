@@ -6,7 +6,7 @@ import {
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
 import type { Adventure, ChapterSummary, StorySegment } from '../shared/types';
 import { createStoryConfiguration, type StoryConfiguration } from './story-config';
-import { estimateContextTokens, selectedChoice, StoryContextBudgetError, StoryContextBuilder } from './story-context';
+import { contextEvents, estimateContextTokens, selectedChoice, StoryContextBudgetError, StoryContextBuilder } from './story-context';
 
 interface ChapterSource {
   chapterNumber: number;
@@ -31,16 +31,6 @@ function chapterSources(adventure: Adventure): ChapterSource[] {
     }
     return { chapterNumber, segments, unsummarized: segments.slice(throughIndex + 1), previousSummary };
   });
-}
-
-function sourceEvents(segments: StorySegment[]) {
-  return segments.map((segment) => ({
-    segmentId: segment.id,
-    chapterNumber: segment.chapterNumber,
-    narrative: segment.narrative,
-    decision: selectedChoice(segment),
-    check: segment.check
-  }));
 }
 
 function summaryText(summary: SummaryResponse): string {
@@ -79,12 +69,12 @@ export class StorySummarizer {
       return [chapterNumber];
     }
     const globalThresholdReached = sources.length > 0
-      && estimateContextTokens(JSON.stringify(sources.flatMap((source) => sourceEvents(source.unsummarized))))
+      && estimateContextTokens(JSON.stringify(sources.flatMap((source) => contextEvents(source.unsummarized))))
         >= this.configuration.globalSummaryThresholdTokens;
     const latestChapter = adventure.segments.at(-1)?.chapterNumber;
     return sources.filter((source) => source.chapterNumber !== latestChapter
       || source.segments.length >= this.configuration.chapterLength
-      || estimateContextTokens(JSON.stringify(sourceEvents(source.unsummarized)))
+      || estimateContextTokens(JSON.stringify(contextEvents(source.unsummarized)))
         >= this.configuration.chapterSummaryThresholdTokens
       || globalThresholdReached).map((source) => source.chapterNumber);
   }
@@ -115,7 +105,7 @@ export class StorySummarizer {
         previousChapterSummary: source.previousSummary?.text ?? '',
         // A chapter's first check resolves a decision offered by the preceding segment.
         precedingDecision: precedingSegment ? selectedChoice(precedingSegment) : null,
-        sourceEvents: sourceEvents(source.unsummarized)
+        sourceEvents: contextEvents(source.unsummarized)
       });
       const estimatedTokens = estimateContextTokens(context);
       if (estimatedTokens > this.configuration.contextBudgetTokens) {
@@ -135,7 +125,8 @@ export class StorySummarizer {
     }
 
     const global = parseSummaryResponse(await provider.summarize({
-      modelId, kind: 'global', context: new StoryContextBuilder(this.configuration).build(staged)
+      modelId, kind: 'global', context: new StoryContextBuilder(this.configuration)
+        .build(staged, { requiredChapterNumbers: due })
     }));
     staged.globalSummary = summaryText(global);
     staged.updatedAt = new Date().toISOString();
