@@ -6,7 +6,7 @@ import {
   parseModelSelection,
   parseOpeningResponse
 } from '../shared/provider-contract';
-import type { Adventure, Choice, ChoiceTurnResult } from '../shared/types';
+import type { Adventure, AdventurePhase, Choice, ChoiceTurnResult, StorySegment } from '../shared/types';
 import { AdventureProgress } from './adventure-progress';
 import type { AdventureStore } from './adventure-storage';
 import type { SelectedStoryProvider, StoryProviderSource } from './providers/active-provider';
@@ -89,6 +89,9 @@ export class StoryController {
     return this.runGeneration(async () => {
       if (typeof turnId !== 'string' || !turnId.trim()) throw new TypeError('A pending turn ID is required.');
       const pending = await this.store.load();
+      if (pending?.phase.kind === 'pending-summary' && pending.phase.turnId === turnId) {
+        return { kind: 'continued', adventure: await this.finishSummaries(pending) };
+      }
       if (!pending || (pending.phase.kind !== 'pending-assessment' && pending.phase.kind !== 'pending-narration')
         || pending.phase.choice.turnId !== turnId) {
         throw new Error('No matching turn awaits resolution.');
@@ -137,7 +140,7 @@ export class StoryController {
       throw new Error('No matching turn awaits completion.');
     }
     const createdAt = new Date().toISOString();
-    const completed = await this.progress.commitTurn(pending.phase.choice.turnId, {
+    const segment: StorySegment = {
       id: pending.phase.choice.turnId,
       chapterNumber: this.summaries.nextChapterNumber(pending),
       narrative: response.narrative,
@@ -145,8 +148,34 @@ export class StoryController {
       selectedChoiceId: null,
       check: pending.phase.kind === 'pending-narration' ? pending.phase.check : null,
       createdAt
-    });
-    return { kind: 'continued', adventure: completed };
+    };
+    const preview: Adventure = { ...pending, segments: [...pending.segments, segment], phase: { kind: 'ready' } };
+    const chapterNumber = this.summaries.chaptersDue(preview)[0];
+    const completed = await this.progress.commitTurn(pending.phase.choice.turnId, segment, chapterNumber);
+    return { kind: 'continued', adventure: await this.finishSummaries(completed) };
+  }
+
+  private summaryPhase(adventure: Adventure, turnId: string): AdventurePhase {
+    const chapterNumber = this.summaries.chaptersDue({ ...adventure, phase: { kind: 'ready' } })[0];
+    return chapterNumber === undefined ? { kind: 'ready' } : { kind: 'pending-summary', turnId, chapterNumber };
+  }
+
+  private async finishSummaries(adventure: Adventure): Promise<Adventure> {
+    let current = adventure;
+    while (current.phase.kind === 'pending-summary') {
+      const pending = current;
+      const turnId = current.phase.turnId;
+      const updated = await this.summaries.stage(pending, async (request) => {
+        const selected = await this.providerSource();
+        const selection = parseModelSelection({ provider: selected.provider.kind, modelId: selected.modelId });
+        return selected.provider.summarize({ ...request, modelId: selection.modelId });
+      });
+      updated.phase = this.summaryPhase(updated, turnId);
+      // Commit both memory levels and the next pending/ready state without replacing source events.
+      await this.store.saveIfUnchanged(pending, updated);
+      current = updated;
+    }
+    return current;
   }
 
   private openingRequest(adventure: Adventure, selected: SelectedStoryProvider) {
@@ -177,7 +206,8 @@ export class StoryController {
       phase: { kind: 'ready' },
       updatedAt: createdAt
     };
+    completed.phase = this.summaryPhase(completed, pending.phase.turnId);
     await this.store.saveIfUnchanged(pending, completed);
-    return completed;
+    return this.finishSummaries(completed);
   }
 }

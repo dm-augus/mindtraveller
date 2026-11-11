@@ -104,7 +104,7 @@ export class AdventureProgress {
     });
   }
 
-  commitTurn(turnId: string, segment: StorySegment): Promise<Adventure> {
+  commitTurn(turnId: string, segment: StorySegment, summaryChapterNumber?: number): Promise<Adventure> {
     return this.runExclusive(async () => {
       const adventure = await this.requireAdventure();
       const phase = adventure.phase;
@@ -124,11 +124,18 @@ export class AdventureProgress {
       if (phase.kind === 'pending-narration' && !sameCheck(segment.check, phase.check)) {
         throw new TypeError('Narration must retain the saved check result.');
       }
+      if (summaryChapterNumber !== undefined && (!Number.isSafeInteger(summaryChapterNumber)
+        || summaryChapterNumber < 1 || ![...adventure.segments, segment].some(
+          (source) => source.chapterNumber === summaryChapterNumber
+        ))) {
+        throw new TypeError('A summary must reference an existing chapter.');
+      }
 
       const next: Adventure = {
         ...adventure,
         segments: [...adventure.segments, segment],
-        phase: { kind: 'ready' },
+        phase: summaryChapterNumber === undefined ? { kind: 'ready' }
+          : { kind: 'pending-summary', turnId, chapterNumber: summaryChapterNumber },
         updatedAt: new Date().toISOString()
       };
       await this.store.saveIfUnchanged(adventure, next);

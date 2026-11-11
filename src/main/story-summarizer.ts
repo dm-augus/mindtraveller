@@ -1,6 +1,7 @@
 import {
   parseSummaryResponse,
   type StoryProvider,
+  type SummaryRequest,
   type SummaryResponse
 } from '../shared/provider-contract';
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
@@ -14,6 +15,10 @@ interface ChapterSource {
   unsummarized: StorySegment[];
   previousSummary: ChapterSummary | undefined;
 }
+
+type SummaryInput =
+  | Omit<Extract<SummaryRequest, { kind: 'chapter' }>, 'modelId'>
+  | Omit<Extract<SummaryRequest, { kind: 'global' }>, 'modelId'>;
 
 function chapterSources(adventure: Adventure): ChapterSource[] {
   const chapters = new Map<number, StorySegment[]>();
@@ -87,6 +92,11 @@ export class StorySummarizer {
     provider: Pick<StoryProvider, 'summarize'>,
     modelId: string
   ): Promise<Adventure> {
+    return this.stage(adventure, (request) => provider.summarize({ ...request, modelId }));
+  }
+
+  /** The controller selects the current provider/model separately for each operation. */
+  async stage(adventure: Adventure, generate: (request: SummaryInput) => Promise<SummaryResponse>): Promise<Adventure> {
     const staged = structuredClone(adventure);
     const due = this.chaptersDue(staged);
     if (!due.length) return staged;
@@ -111,8 +121,8 @@ export class StorySummarizer {
       if (estimatedTokens > this.configuration.contextBudgetTokens) {
         throw new StoryContextBudgetError(estimatedTokens, this.configuration.contextBudgetTokens);
       }
-      const summary = parseSummaryResponse(await provider.summarize({
-        modelId, kind: 'chapter', chapterNumber, context
+      const summary = parseSummaryResponse(await generate({
+        kind: 'chapter', chapterNumber, context
       }));
       const next: ChapterSummary = {
         chapterNumber,
@@ -124,8 +134,8 @@ export class StorySummarizer {
       else staged.chapterSummaries[existing] = next;
     }
 
-    const global = parseSummaryResponse(await provider.summarize({
-      modelId, kind: 'global', context: new StoryContextBuilder(this.configuration)
+    const global = parseSummaryResponse(await generate({
+      kind: 'global', context: new StoryContextBuilder(this.configuration)
         .build(staged, { requiredChapterNumbers: due })
     }));
     staged.globalSummary = summaryText(global);

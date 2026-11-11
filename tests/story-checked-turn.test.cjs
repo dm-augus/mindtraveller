@@ -45,6 +45,7 @@ function provider(handlers = {}) {
   const narrations = [];
   return {
     kind: 'ollama', assessments, narrations,
+    summarize: async () => ({ text: 'Mira attempted the gate.', keyFacts: [], unresolvedThreads: ['Find Mira’s sister.'] }),
     generateOpening: async () => ({ premise: 'A new mystery.', narrative: 'A new road begins.', choices }),
     assessAction: async (request) => {
       assessments.push(structuredClone(request));
@@ -125,7 +126,9 @@ for (const roll of [25, 30, 99]) {
     assert.deepEqual(segment.check, pending.phase.check);
     assert.equal(segment.choices.length, 4);
     assert.deepEqual(await new AdventureStore(directory).load(), result.adventure);
-    assert.deepEqual(JSON.parse(await fs.readFile(store.backupPath, 'utf8')), pending);
+    const backup = JSON.parse(await fs.readFile(store.backupPath, 'utf8'));
+    assert.equal(backup.phase.kind, 'pending-summary');
+    assert.deepEqual(backup.segments, result.adventure.segments);
     assert.equal(stub.assessments.length, 1);
     assert.equal(stub.narrations.length, 1);
     await assert.rejects(controller.retryTurn(pending.phase.choice.turnId), /No matching turn/);

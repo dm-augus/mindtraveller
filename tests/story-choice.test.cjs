@@ -42,6 +42,7 @@ function provider(handler) {
   const requests = [];
   return {
     kind: 'ollama', requests,
+    summarize: async () => ({ text: 'Mira reached the abbey.', keyFacts: [], unresolvedThreads: ['Find Mira’s sister.'] }),
     generateOpening: async () => ({ premise: 'A new mystery.', narrative: 'A new road begins.', choices }),
     assessAction: async (request) => {
       requests.push(structuredClone(request));
@@ -109,7 +110,9 @@ test('choice is durably selected before assessment; a no-check scene and choices
   assert.equal(completed.segments[1].check, null);
   assert.equal(completed.segments[1].selectedChoiceId, null);
   assert.deepEqual(await new AdventureStore(directory).load(), completed);
-  assert.deepEqual(JSON.parse(await fs.readFile(store.backupPath, 'utf8')), pending);
+  const backup = JSON.parse(await fs.readFile(store.backupPath, 'utf8'));
+  assert.equal(backup.phase.kind, 'pending-summary');
+  assert.deepEqual(backup.segments, completed.segments);
 });
 
 test('duplicate and conflicting clicks and concurrent retry produce only one assessment', async (t) => {

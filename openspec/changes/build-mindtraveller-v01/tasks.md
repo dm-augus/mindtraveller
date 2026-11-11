@@ -37,7 +37,7 @@
 - [x] 6.1 Implement opening-story generation and persistence; verify a provider stub yields a premise, narrative, and valid first choices from the selected theme and character.
 - [x] 6.2 Implement choice submission and the no-check continuation path with one pending turn at a time; verify tests cover duplicate clicks, successful commit, and retry after timeout.
 - [x] 6.3 Implement checked turns from validated assessment through saved D100 result to compatible narration; verify tests prove a narration failure or restart reuses the same roll.
-- [ ] 6.4 Connect chapter summarization to completed turns and restoreable pending states; verify tests cover summary failure and retry without losing the completed segment.
+- [x] 6.4 Connect chapter summarization to completed turns and restoreable pending states; verify tests cover summary failure and retry without losing the completed segment.
 
 ## 7. Desktop screens
 
