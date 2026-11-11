@@ -8,9 +8,9 @@
 
 ## 2. Character and D100 rules
 
-- [ ] 2.1 Implement theme, identity, Nature, attribute range, and Balanced/Simplified allocation validation; verify focused tests cover both valid methods and invalid budgets or ranges.
-- [ ] 2.2 Implement difficulty mapping, threshold clamping, application-owned D100 generation, and result records; verify tests cover 0 and 98 limits, inclusive success, and 99/100 failure.
-- [ ] 2.3 Define the rule text used by prompts and the Rules screen from the agreed English terminology; verify it matches the validated ranges and thresholds in tests or reviewable rule fixtures.
+- [x] 2.1 Implement theme, identity, Nature, attribute range, and Balanced/Simplified allocation validation; verify focused tests cover both valid methods and invalid budgets or ranges.
+- [x] 2.2 Implement difficulty mapping, threshold clamping, application-owned D100 generation, and result records; verify tests cover 0 and 98 limits, inclusive success, and 99/100 failure.
+- [x] 2.3 Define the rule text used by prompts and the Rules screen from the agreed English terminology; verify it matches the validated ranges and thresholds in tests or reviewable rule fixtures.
 
 ## 3. Durable local state
 
