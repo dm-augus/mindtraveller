@@ -24,7 +24,7 @@
 - [x] 4.1 Define provider-independent request/response contracts for opening, action assessment, checked narration, summaries, and model selection; verify schema tests reject malformed choices and check classifications.
 - [x] 4.2 Implement Ollama address handling, model discovery, requests, timeout, and failure mapping; verify adapter tests with a local stub cover success, unavailable server, bad model, and timeout.
 - [x] 4.3 Implement OpenAI model/key configuration, requests, timeout, and failure mapping; verify adapter tests with a stub cover success, authentication error, inaccessible model, and redacted errors.
-- [ ] 4.4 Add bounded retries for invalid LLM responses and map exhausted retries to a recoverable application error; verify malformed-response tests leave adventure state intact.
+- [x] 4.4 Add bounded retries for invalid LLM responses and map exhausted retries to a recoverable application error; verify malformed-response tests leave adventure state intact.
 
 ## 5. Story memory
 

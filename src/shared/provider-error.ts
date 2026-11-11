@@ -5,6 +5,7 @@ export type ProviderFailureCode =
   | 'authentication-failed'
   | 'inaccessible-model'
   | 'request-timeout'
+  | 'invalid-provider-response'
   | 'request-failed';
 
 export class ProviderError extends Error {

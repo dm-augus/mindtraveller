@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const test = require('node:test');
-const { ProviderContractError } = require('../dist/shared/provider-contract.js');
 const { ProviderError } = require('../dist/shared/provider-error.js');
 const { OpenAiAdapter } = require('../dist/main/providers/openai.js');
 
@@ -204,6 +203,6 @@ test('incomplete and malformed successful responses reject before gameplay', asy
   const adapter = new OpenAiAdapter({ getOpenAiKeyForRequest: async () => secret }, {
     fetchImpl: localFetch(address)
   });
-  await assert.rejects(adapter.generateOpening(opening), ProviderContractError);
-  await assert.rejects(adapter.generateOpening(opening), ProviderContractError);
+  await assert.rejects(adapter.generateOpening(opening), expectCode('invalid-provider-response'));
+  await assert.rejects(adapter.generateOpening(opening), expectCode('invalid-provider-response'));
 });

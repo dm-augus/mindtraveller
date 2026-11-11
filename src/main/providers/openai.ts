@@ -17,6 +17,7 @@ import {
 } from '../../shared/provider-contract';
 import { ProviderError } from '../../shared/provider-error';
 import type { ModelOption } from '../../shared/types';
+import { withResponseRetries } from './response-retries';
 import {
   assessmentMessages,
   checkedNarrationMessages,
@@ -149,37 +150,34 @@ export class OpenAiAdapter implements StoryProvider {
     }));
   }
 
-  private async generate(model: string, messages: ProviderMessage[]): Promise<unknown> {
-    const response = await this.request('responses', {
-      model: modelId(model),
-      input: messages,
-      text: { format: { type: 'json_object' } },
-      store: false
+  private async generate<T>(model: string, messages: ProviderMessage[], parse: (content: unknown) => T): Promise<T> {
+    return withResponseRetries(this.kind, async () => {
+      const response = await this.request('responses', {
+        model: modelId(model),
+        input: messages,
+        text: { format: { type: 'json_object' } },
+        store: false
+      });
+      return parse(responseContent(response));
     });
-    return responseContent(response);
   }
 
   async generateOpening(request: OpeningRequest): Promise<OpeningResponse> {
-    return parseOpeningResponse(
-      await this.generate(request.modelId, openingMessages(request)), request.choiceTarget
-    );
+    return this.generate(request.modelId, openingMessages(request),
+      (content) => parseOpeningResponse(content, request.choiceTarget));
   }
 
   async assessAction(request: ActionAssessmentRequest): Promise<ActionAssessmentResponse> {
-    return parseActionAssessmentResponse(
-      await this.generate(request.modelId, assessmentMessages(request)),
-      request.choiceTarget, request.attributes
-    );
+    return this.generate(request.modelId, assessmentMessages(request),
+      (content) => parseActionAssessmentResponse(content, request.choiceTarget, request.attributes));
   }
 
   async narrateCheck(request: CheckedNarrationRequest): Promise<CheckedNarrationResponse> {
-    return parseCheckedNarrationResponse(
-      await this.generate(request.modelId, checkedNarrationMessages(request)),
-      request.choiceTarget, request.check.outcome
-    );
+    return this.generate(request.modelId, checkedNarrationMessages(request),
+      (content) => parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome));
   }
 
   async summarize(request: SummaryRequest): Promise<SummaryResponse> {
-    return parseSummaryResponse(await this.generate(request.modelId, summaryMessages(request)));
+    return this.generate(request.modelId, summaryMessages(request), parseSummaryResponse);
   }
 }

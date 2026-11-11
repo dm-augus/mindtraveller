@@ -17,6 +17,7 @@ import {
 } from '../../shared/provider-contract';
 import { ProviderError } from '../../shared/provider-error';
 import type { ModelOption } from '../../shared/types';
+import { withResponseRetries } from './response-retries';
 import {
   assessmentMessages,
   checkedNarrationMessages,
@@ -140,33 +141,34 @@ export class OllamaAdapter implements StoryProvider {
     return parseModelOptions(models);
   }
 
-  private async chat(model: string, messages: ProviderMessage[]): Promise<unknown> {
-    const response = await this.request('/api/chat', {
-      model: modelId(model),
-      messages,
-      stream: false,
-      format: 'json'
+  private async chat<T>(model: string, messages: ProviderMessage[], parse: (content: unknown) => T): Promise<T> {
+    return withResponseRetries(this.kind, async () => {
+      const response = await this.request('/api/chat', {
+        model: modelId(model),
+        messages,
+        stream: false,
+        format: 'json'
+      });
+      return parse(chatContent(response));
     });
-    return chatContent(response);
   }
 
   async generateOpening(request: OpeningRequest): Promise<OpeningResponse> {
-    const content = await this.chat(request.modelId, openingMessages(request));
-    return parseOpeningResponse(content, request.choiceTarget);
+    return this.chat(request.modelId, openingMessages(request),
+      (content) => parseOpeningResponse(content, request.choiceTarget));
   }
 
   async assessAction(request: ActionAssessmentRequest): Promise<ActionAssessmentResponse> {
-    const content = await this.chat(request.modelId, assessmentMessages(request));
-    return parseActionAssessmentResponse(content, request.choiceTarget, request.attributes);
+    return this.chat(request.modelId, assessmentMessages(request),
+      (content) => parseActionAssessmentResponse(content, request.choiceTarget, request.attributes));
   }
 
   async narrateCheck(request: CheckedNarrationRequest): Promise<CheckedNarrationResponse> {
-    const content = await this.chat(request.modelId, checkedNarrationMessages(request));
-    return parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome);
+    return this.chat(request.modelId, checkedNarrationMessages(request),
+      (content) => parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome));
   }
 
   async summarize(request: SummaryRequest): Promise<SummaryResponse> {
-    const content = await this.chat(request.modelId, summaryMessages(request));
-    return parseSummaryResponse(content);
+    return this.chat(request.modelId, summaryMessages(request), parseSummaryResponse);
   }
 }

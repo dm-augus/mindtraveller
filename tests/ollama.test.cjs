@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const test = require('node:test');
-const { ProviderContractError } = require('../dist/shared/provider-contract.js');
 const { ProviderError } = require('../dist/shared/provider-error.js');
 const { OllamaAdapter, normalizeOllamaAddress } = require('../dist/main/providers/ollama.js');
 
@@ -163,5 +162,5 @@ test('server failures and malformed model output have distinct error types', asy
   await assert.rejects(adapter.generateOpening({
     modelId: 'story-model', theme: 'Horror', character, rules: 'D100 rules',
     paragraphTarget: 2, choiceTarget: 3
-  }), (error) => error instanceof ProviderContractError);
+  }), expectProviderCode('invalid-provider-response'));
 });
