@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { CharacterSetup } from '../shared/character-rules';
 import type {
+  Adventure,
   AppInfo,
   NewStoryRequest,
   NewStoryResolution,
@@ -17,5 +19,8 @@ contextBridge.exposeInMainWorld('mindtraveller', {
     ipcRenderer.invoke('settings:set-openai-key', key, persist),
   requestNewStory: (): Promise<NewStoryRequest> => ipcRenderer.invoke('story:new-request'),
   resolveNewStory: (confirmationId: string, decision: 'Yes' | 'No'): Promise<NewStoryResolution> =>
-    ipcRenderer.invoke('story:new-resolve', confirmationId, decision)
+    ipcRenderer.invoke('story:new-resolve', confirmationId, decision),
+  startOpening: (setup: CharacterSetup): Promise<Adventure> => ipcRenderer.invoke('story:start-opening', setup),
+  retryOpening: (): Promise<Adventure> => ipcRenderer.invoke('story:retry-opening'),
+  restoreAdventure: (): Promise<Adventure | null> => ipcRenderer.invoke('story:restore')
 });

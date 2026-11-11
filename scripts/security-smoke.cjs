@@ -22,7 +22,8 @@ app.on('browser-window-created', (_event, window) => {
         result.rawIpc !== 'undefined' ||
         JSON.stringify(result.bridgeKeys) !== JSON.stringify([
           'getAppInfo', 'getProviderSettings', 'quit', 'requestNewStory',
-          'resolveNewStory', 'saveProviderConfiguration', 'setOpenAiKey'
+          'resolveNewStory', 'restoreAdventure', 'retryOpening', 'saveProviderConfiguration',
+          'setOpenAiKey', 'startOpening'
         ]) ||
         result.version !== app.getVersion() ||
         !result.csp?.includes("default-src 'none'") ||

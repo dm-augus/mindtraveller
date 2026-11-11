@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { isAdventure } from '../shared/adventure-validation';
 import type { Adventure } from '../shared/types';
 
@@ -102,6 +103,20 @@ export class AdventureStore {
     // Serialize at submission time so queued saves cannot observe later mutations.
     const text = serializeAdventure(adventure);
     const write = this.writes.catch(() => undefined).then(() => this.writeDocument(text));
+    this.writes = write;
+    await write;
+  }
+
+  async saveIfUnchanged(expected: Adventure | null, adventure: Adventure): Promise<void> {
+    const snapshot = structuredClone(expected);
+    const text = serializeAdventure(adventure);
+    // Check and replace inside the same queue used by saves and New Story discard.
+    const write = this.writes.catch(() => undefined).then(async () => {
+      if (!isDeepStrictEqual(await this.readVisibleAdventure(), snapshot)) {
+        throw new Error('The saved adventure changed. Restore the current adventure before retrying.');
+      }
+      await this.writeDocument(text);
+    });
     this.writes = write;
     await write;
   }

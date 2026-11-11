@@ -1,4 +1,6 @@
+import type { CharacterSetup } from '../shared/character-rules';
 import type {
+  Adventure,
   AppInfo,
   NewStoryRequest,
   NewStoryResolution,
@@ -18,6 +20,9 @@ declare global {
       setOpenAiKey(key: string, persist: boolean): Promise<{ persisted: boolean }>;
       requestNewStory(): Promise<NewStoryRequest>;
       resolveNewStory(confirmationId: string, decision: 'Yes' | 'No'): Promise<NewStoryResolution>;
+      startOpening(setup: CharacterSetup): Promise<Adventure>;
+      retryOpening(): Promise<Adventure>;
+      restoreAdventure(): Promise<Adventure | null>;
     };
   }
 }

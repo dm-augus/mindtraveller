@@ -5,6 +5,8 @@ import type { AppInfo } from '../shared/types';
 import { AdventureStore } from './adventure-storage';
 import { NewStoryController } from './new-story';
 import { ProviderSettingsStore } from './provider-settings';
+import { selectStoryProvider } from './providers/active-provider';
+import { StoryController } from './story-controller';
 
 const rendererPath = path.join(__dirname, '../renderer/index.html');
 const rendererUrl = pathToFileURL(rendererPath).href;
@@ -12,6 +14,7 @@ const trustedWindowIds = new Set<number>();
 let providerSettingsStore: ProviderSettingsStore | null = null;
 let activeAdventureStore: AdventureStore | null = null;
 let newStoryController: NewStoryController | null = null;
+let activeStoryController: StoryController | null = null;
 
 function adventureStore(): AdventureStore {
   if (activeAdventureStore === null) activeAdventureStore = new AdventureStore(app.getPath('userData'));
@@ -28,6 +31,13 @@ function settingsStore(): ProviderSettingsStore {
     providerSettingsStore = new ProviderSettingsStore(app.getPath('userData'), safeStorage);
   }
   return providerSettingsStore;
+}
+
+function story(): StoryController {
+  if (activeStoryController === null) {
+    activeStoryController = new StoryController(adventureStore(), () => selectStoryProvider(settingsStore()));
+  }
+  return activeStoryController;
 }
 
 function assertTrustedRequest(event: IpcMainInvokeEvent, args: unknown[], expectedArguments = 0): void {
@@ -80,6 +90,21 @@ ipcMain.handle('story:new-request', (event, ...args: unknown[]) => {
 ipcMain.handle('story:new-resolve', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 2);
   return newStory().resolve(args[0], args[1]);
+});
+
+ipcMain.handle('story:start-opening', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 1);
+  return story().startOpening(args[0]);
+});
+
+ipcMain.handle('story:retry-opening', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args);
+  return story().retryOpening();
+});
+
+ipcMain.handle('story:restore', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args);
+  return story().restore();
 });
 
 function createWindow(): void {
