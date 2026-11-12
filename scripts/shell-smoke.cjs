@@ -1,13 +1,20 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const http = require('node:http');
 const path = require('node:path');
-const { app } = require('electron');
+const { app, safeStorage } = require('electron');
 const { AdventureStore } = require('../dist/main/adventure-storage.js');
+const { ProviderSettingsStore } = require('../dist/main/provider-settings.js');
 
 const output = path.resolve(__dirname, '../out/smoke');
 // Retain the isolated Chromium profile with the screenshots; its databases stay locked until exit.
 app.disableHardwareAcceleration();
 let userData;
+let providerServer;
+let openingRequests = 0;
+let checkedAssessments = 0;
+let simpleAssessments = 0;
+const narratedChecks = [];
 let finishing = false;
 const timeout = setTimeout(() => { void finish(1, new Error('Shell smoke check timed out.')); }, 30_000);
 
@@ -16,6 +23,7 @@ async function finish(code, error) {
   finishing = true;
   clearTimeout(timeout);
   if (error) console.error(error);
+  providerServer?.close();
   app.exit(code);
 }
 
@@ -46,7 +54,10 @@ function adventure() {
 }
 
 async function checkWindow(window, store) {
-  const evaluate = (fn, ...args) => window.webContents.executeJavaScript(`(${fn.toString()})(...${JSON.stringify(args)})`);
+  const evaluate = async (fn, ...args) => {
+    try { return await window.webContents.executeJavaScript(`(${fn.toString()})(...${JSON.stringify(args)})`); }
+    catch (error) { throw new Error(`Renderer check failed: ${fn.toString()}`, { cause: error }); }
+  };
   const settle = () => new Promise((resolve) => setTimeout(resolve, 80));
   async function waitFor(fn) {
     for (let attempt = 0; attempt < 80; attempt += 1) {
@@ -106,6 +117,136 @@ async function checkWindow(window, store) {
   await settle();
   await layout();
   await capture('shell-empty-760');
+
+  await evaluate(() => document.querySelector('[data-view="new-story"]').click());
+  await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'new-story');
+  assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
+  await evaluate(() => {
+    document.querySelector('input[name="theme"][value="Horror"]').click();
+    document.querySelector('input[name="allocation-method"][value="Balanced"]').click();
+    document.querySelector('input[name="nature"][value="Good"]').click();
+  });
+  await evaluate(() => {
+    const change = (selector, value) => {
+      const field = document.querySelector(selector);
+      const prototype = field.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, 'value').set.call(field, value);
+      field.dispatchEvent(new Event(field.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+    };
+    change('[aria-label="Strength value"]', '3');
+    change('[aria-label="Dexterity value"]', '2');
+    change('[aria-label="Intelligence value"]', '-1');
+    change('.identity-grid input:first-of-type', 'Aveline');
+    change('.identity-grid label:nth-child(2) input', 'Woman');
+  });
+  assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true,
+    'Incomplete Balanced allocation must not advance.');
+  assert.equal(await evaluate(() => [...document.querySelector('[aria-label="Charisma value"]').options]
+    .some((option) => option.value === '2')), false, 'Out of range Charisma must not be selectable.');
+  await evaluate(() => document.querySelector('input[name="allocation-method"][value="Simplified"]').click());
+  assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true,
+    'Switching methods resets the allocation to zero.');
+  await evaluate(() => {
+    const field = document.querySelector('[aria-label="Strength value"]');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(field, '3');
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await waitFor(() => document.querySelector('.setup-start')?.disabled === false);
+  await evaluate(() => document.querySelector('input[name="allocation-method"][value="Balanced"]').click());
+  assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
+  await evaluate(() => {
+    for (const [attribute, value] of [['Strength', '3'], ['Dexterity', '2'], ['Intelligence', '-2']]) {
+      const field = document.querySelector(`[aria-label="${attribute} value"]`);
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(field, value);
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  await waitFor(() => document.querySelector('.setup-start')?.disabled === false);
+  await capture('setup-valid-760');
+  await evaluate(() => document.querySelector('.setup-start').click());
+  await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'story'
+    && document.querySelectorAll('[data-choice-id]').length === 3);
+  const generated = await store.load();
+  assert.equal(openingRequests, 1);
+  assert.equal(generated.theme, 'Horror');
+  assert.equal(generated.character.name, 'Aveline');
+  assert.equal(generated.character.gender, 'Woman');
+  assert.equal(generated.character.nature, 'Good');
+  assert.deepEqual(generated.character.attributes,
+    { Strength: 3, Dexterity: 2, Intelligence: -2, Endurance: 0, Charisma: 0, Luck: 0 });
+  assert.equal(generated.phase.kind, 'ready');
+  await capture('setup-generated-760');
+
+  await evaluate(() => document.querySelector('[data-choice-id="enter"]').click());
+  assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 3);
+  await waitFor(() => Boolean(document.querySelector('[aria-label="Saved check result"]')
+    && document.querySelector('.retry-button:not(:disabled)')));
+  const pendingCheck = (await store.load()).phase.check;
+  assert.equal((await store.load()).phase.kind, 'pending-narration');
+  assert.equal(checkedAssessments, 1);
+  const checkText = await evaluate(() => document.querySelector('[aria-label="Saved check result"]').textContent);
+  assert.match(checkText, /Hard/);
+  assert.match(checkText, /Strength \+3/);
+  assert.ok(checkText.includes(String(pendingCheck.roll)));
+  assert.ok(checkText.includes(String(pendingCheck.threshold)));
+  assert.ok(checkText.includes(pendingCheck.outcome === 'success' ? 'Success' : 'Failure'));
+  const pendingVisibility = await evaluate(() => {
+    const pane = document.querySelector('.story-scroll').getBoundingClientRect();
+    const check = document.querySelector('[aria-label="Saved check result"]').getBoundingClientRect();
+    const choices = document.querySelector('.choice-list').getBoundingClientRect();
+    const retry = document.querySelector('.retry-button').getBoundingClientRect();
+    const summary = document.querySelector('[aria-label="Saved roll summary"]').getBoundingClientRect();
+    return { pane: [pane.top, pane.bottom], check: [check.top, check.bottom],
+      choices: [choices.top, choices.bottom], retry: [retry.top, retry.bottom],
+      summary: [summary.top, summary.bottom] };
+  });
+  assert.equal(pendingVisibility.check[0] >= pendingVisibility.pane[0] - 1
+    && pendingVisibility.check[0] < pendingVisibility.pane[1]
+    && pendingVisibility.retry[0] >= pendingVisibility.choices[0]
+    && pendingVisibility.retry[1] <= pendingVisibility.choices[1]
+    && pendingVisibility.summary[0] >= pendingVisibility.choices[0]
+    && pendingVisibility.summary[1] <= pendingVisibility.choices[1], true,
+  `The saved check and retry action must be visible at the smaller window size: ${JSON.stringify(pendingVisibility)}`);
+  const summaryText = await evaluate(() => document.querySelector('[aria-label="Saved roll summary"]').textContent);
+  assert.ok(summaryText.includes(`D100 ${pendingCheck.roll} / ${pendingCheck.threshold}`));
+  assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 3);
+  await capture('story-check-pending-760');
+  await evaluate(() => document.querySelector('.retry-button').click());
+  await waitFor(() => document.querySelectorAll('[data-segment-id]').length === 2
+    && document.querySelectorAll('[data-choice-id]:disabled').length === 0);
+  const checked = await store.load();
+  assert.equal(checked.phase.kind, 'ready');
+  assert.deepEqual(checked.segments.at(-1).check, pendingCheck);
+  assert.equal(checked.segments[0].selectedChoiceId, 'enter');
+  assert.equal(checkedAssessments, 1);
+  assert.deepEqual(narratedChecks, [pendingCheck, pendingCheck]);
+  assert.equal(await evaluate(() => document.querySelectorAll('[aria-label="Check result"]').length), 1);
+  const completeVisibility = await evaluate(() => {
+    const pane = document.querySelector('.story-scroll').getBoundingClientRect();
+    const check = document.querySelector('[aria-label="Check result"]').getBoundingClientRect();
+    return { pane: [pane.top, pane.bottom], check: [check.top, check.bottom] };
+  });
+  assert.equal(completeVisibility.check[0] >= completeVisibility.pane[0] - 1
+    && completeVisibility.check[0] < completeVisibility.pane[1], true,
+  `The committed check must be visible after the turn completes: ${JSON.stringify(completeVisibility)}`);
+  await capture('story-check-complete-760');
+
+  await evaluate(() => document.querySelector('[data-choice-id="ask"]').click());
+  await waitFor(() => Boolean(document.querySelector('.pending-story')?.textContent.includes('Action awaiting assessment')
+    && document.querySelector('.retry-button:not(:disabled)')));
+  assert.equal((await store.load()).phase.kind, 'pending-assessment');
+  assert.equal(simpleAssessments, 1);
+  assert.equal(await evaluate(() => document.querySelectorAll('[aria-label="Saved check result"]').length), 0);
+  await evaluate(() => document.querySelector('.retry-button').click());
+  await waitFor(() => document.querySelectorAll('[data-segment-id]').length === 3
+    && document.querySelectorAll('[data-choice-id]:disabled').length === 0);
+  const simple = await store.load();
+  assert.equal(simple.phase.kind, 'ready');
+  assert.equal(simple.segments.at(-1).check, null);
+  assert.equal(simple.segments[1].selectedChoiceId, 'ask');
+  assert.equal(simpleAssessments, 2);
+  assert.equal(await evaluate(() => document.querySelectorAll('[aria-label="Check result"]').length), 1);
+  await capture('story-no-check-complete-760');
 
   const saved = adventure();
   await store.save(saved);
@@ -191,6 +332,48 @@ void (async () => {
   await fs.mkdir(output, { recursive: true });
   userData = await fs.mkdtemp(path.join(output, 'profile-'));
   app.setPath('userData', userData);
+  providerServer = http.createServer(async (request, response) => {
+    if (request.url !== '/api/chat') { response.writeHead(404).end(); return; }
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    const body = JSON.parse(raw);
+    const prompt = JSON.parse(body.messages[1].content);
+    const choices = [
+      { id: 'enter', text: 'Enter the crypt.' },
+      { id: 'ask', text: 'Question the villagers.' },
+      { id: 'wait', text: 'Wait for nightfall.' }
+    ];
+    let content;
+    if (prompt.operation === 'opening') {
+      assert.equal(prompt.theme, 'Horror');
+      assert.equal(prompt.character.name, 'Aveline');
+      openingRequests += 1;
+      content = { premise: 'A bell rings beneath the village.',
+        narrative: 'Aveline approaches the crypt. The villagers wait behind her.', choices };
+    } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'enter') {
+      checkedAssessments += 1;
+      content = { kind: 'check', difficulty: 'Hard', attribute: 'Strength' };
+    } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'ask') {
+      simpleAssessments += 1;
+      if (simpleAssessments === 1) { response.writeHead(503).end(); return; }
+      content = { kind: 'no-check', narrative: 'The villagers share a warning.', choices };
+    } else if (prompt.operation === 'checked-narration') {
+      narratedChecks.push(prompt.check);
+      if (narratedChecks.length === 1) { response.writeHead(503).end(); return; }
+      content = { outcome: prompt.check.outcome,
+        narrative: prompt.check.outcome === 'success' ? 'Aveline opens the crypt door.' : 'The crypt door resists Aveline.', choices };
+    } else {
+      throw new Error(`Unexpected smoke provider operation: ${prompt.operation}`);
+    }
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ done: true, message: { role: 'assistant', content: JSON.stringify(content) } }));
+  });
+  await new Promise((resolve) => providerServer.listen(0, '127.0.0.1', resolve));
+  await new ProviderSettingsStore(userData, safeStorage).saveConfiguration({
+    activeProvider: 'ollama',
+    ollama: { serverAddress: `http://127.0.0.1:${providerServer.address().port}`, modelId: 'smoke-model' },
+    openai: { modelId: null }
+  });
   const store = new AdventureStore(userData);
   app.once('browser-window-created', (_event, window) => {
     window.webContents.once('did-finish-load', () => { void checkWindow(window, store).catch((error) => finish(1, error)); });

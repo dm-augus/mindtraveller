@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Adventure, ProviderSettings } from '../shared/types';
+import type { Adventure, CheckRecord, ProviderSettings } from '../shared/types';
+import type { CharacterSetup } from '../shared/character-rules';
 import { RULES_SECTIONS } from '../shared/rules-reference';
+import { NewStorySetup } from './NewStorySetup';
 import diceArtwork from '../assets/branding/dice_artwork.png';
 import newStoryIcon from '../assets/icons/new_story_transparent.png';
 import rulesIcon from '../assets/icons/rules_transparent.png';
@@ -30,6 +32,40 @@ function statusText(adventure: Adventure | null): string {
   }
 }
 
+function CheckResult({ check, pending = false }: { check: CheckRecord; pending?: boolean }): React.JSX.Element {
+  const signedValue = formatAttributeValue(check.attributeValue);
+  return <section className={`check-result ${check.outcome}`} aria-label={pending ? 'Saved check result' : 'Check result'}>
+    <div className="check-heading"><strong>{pending ? 'Roll saved · Awaiting narration' : 'D100 check'}</strong>
+      <span className="check-outcome">{check.outcome === 'success' ? 'Success' : 'Failure'}</span></div>
+    <dl className="check-details">
+      <div><dt>Difficulty</dt><dd>{check.difficulty}</dd></div>
+      <div><dt>Attribute</dt><dd>{check.attribute} {signedValue}</dd></div>
+      <div><dt>D100 roll</dt><dd>{check.roll}</dd></div>
+      <div><dt>Threshold</dt><dd>{check.threshold}</dd></div>
+    </dl>
+  </section>;
+}
+
+function formatAttributeValue(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function PendingStoryState({ adventure }: { adventure: Adventure }): React.JSX.Element | null {
+  const phase = adventure.phase;
+  if (phase.kind === 'ready') return null;
+  if (phase.kind === 'pending-opening') return <div className="pending-story" role="status">
+    <strong>Opening awaiting generation</strong><p>Your character is saved. Continue to request the opening scene.</p>
+  </div>;
+  if (phase.kind === 'pending-summary') return <div className="pending-story" role="status">
+    <strong>Story memory update pending</strong><p>The latest scene is saved. Continue to finish the chapter summary.</p>
+  </div>;
+  return <div className="pending-story" role="status">
+    {phase.kind === 'pending-narration' ? <CheckResult check={phase.check} pending />
+      : <strong>Action awaiting assessment</strong>}
+    <p>You chose: {phase.choice.choiceText}</p>
+  </div>;
+}
+
 function StoryContent({ adventure, onNewStory }: { adventure: Adventure | null; onNewStory: () => void }): React.JSX.Element {
   if (!adventure || !adventure.segments.length) return (
     <div className="welcome">
@@ -37,6 +73,7 @@ function StoryContent({ adventure, onNewStory }: { adventure: Adventure | null; 
       <p className="eyebrow">Every choice opens a new path</p><h2>A new adventure awaits…</h2>
       <p>Journey into medieval worlds of mystery, magic, and romance. Your character, your choices, your story.</p>
       {!adventure && <button className="retro-button welcome-button" onClick={onNewStory}>Begin a new story</button>}
+      {adventure && <PendingStoryState adventure={adventure} />}
     </div>
   );
   return <div className="story-transcript">
@@ -45,10 +82,12 @@ function StoryContent({ adventure, onNewStory }: { adventure: Adventure | null; 
       <article className="story-segment" key={segment.id} data-segment-id={segment.id}>
         {(index === 0 || segment.chapterNumber !== adventure.segments[index - 1].chapterNumber) &&
           <h2 className="chapter-heading">Chapter {segment.chapterNumber}</h2>}
+        {segment.check && <CheckResult check={segment.check} />}
         {segment.narrative.split(/\n\s*\n/).map((paragraph, paragraphIndex) => <p key={paragraphIndex}>{paragraph}</p>)}
         {segment.selectedChoiceId && <p className="chosen-action">You chose: {segment.choices.find((choice) => choice.id === segment.selectedChoiceId)?.text}</p>}
       </article>
     ))}
+    <PendingStoryState adventure={adventure} />
   </div>;
 }
 
@@ -63,6 +102,16 @@ export function App(): React.JSX.Element {
   const inFlight = useRef(false);
   const storyScroll = useRef<HTMLDivElement>(null);
   useEffect(() => { storyScroll.current?.scrollTo({ top: 0 }); }, [view]);
+  useEffect(() => {
+    if (view !== 'story' || !adventure) return;
+    const panel = storyScroll.current;
+    const target = adventure.phase.kind === 'ready'
+      ? panel?.querySelector('.story-segment:last-of-type')
+      : adventure.phase.kind === 'pending-narration'
+        ? panel?.querySelector('.pending-story .check-result')
+        : panel?.querySelector('.pending-story');
+    target?.scrollIntoView({ block: 'start' });
+  }, [adventure?.segments.length, adventure?.phase.kind, view]);
   useEffect(() => {
     let active = true;
     void Promise.allSettled([
@@ -96,6 +145,14 @@ export function App(): React.JSX.Element {
     void runOperation(() => phase.kind === 'pending-opening' ? window.mindtraveller.retryOpening()
       : window.mindtraveller.retryTurn('choice' in phase ? phase.choice.turnId : phase.turnId).then((result) => result.adventure),
     phase.kind === 'pending-summary' ? 'Updating story memory…' : 'Continuing your story…');
+  }
+
+  function startStory(setup: CharacterSetup): void {
+    void runOperation(async () => {
+      const opened = await window.mindtraveller.startOpening(setup);
+      setView('story');
+      return opened;
+    }, 'Opening your story…');
   }
 
   async function quit(): Promise<void> {
@@ -133,10 +190,7 @@ export function App(): React.JSX.Element {
             {error && <div className="error-banner" role="alert">{error}</div>}
             <div className="story-scroll" ref={storyScroll} tabIndex={0} aria-label={VIEW_TITLES[view]}>
               {view === 'story' && <StoryContent adventure={adventure} onNewStory={() => setView('new-story')} />}
-              {view === 'new-story' && <div className="page-introduction"><p className="eyebrow">Turn the first page</p><h2>Who will you become?</h2>
-                <p>Choose a medieval world, create your traveller, and let your first decision set the adventure in motion.</p>
-                <dl className="theme-descriptions"><dt>Horror</dt><dd>Ancient secrets, haunted places, and the unknown.</dd>
-                  <dt>Romance</dt><dd>Unexpected encounters, loyalties, and matters of the heart.</dd><dt>High Fantasy</dt><dd>Magic, mythical creatures, and extraordinary quests.</dd></dl></div>}
+              {view === 'new-story' && <NewStorySetup busy={busy} onStart={startStory} />}
               {view === 'rules' && <div className="rules-content">{RULES_SECTIONS.map((section) => <section key={section.heading}><h3>{section.heading}</h3><p>{section.text}</p></section>)}</div>}
               {view === 'settings' && <div className="page-introduction"><p className="eyebrow">The voice behind your adventure</p><h2>Your storyteller</h2>
                 <p>Stories can be told by a local Ollama model or an OpenAI model.</p>
@@ -147,11 +201,24 @@ export function App(): React.JSX.Element {
           <section className="decision-panel inset-panel" aria-labelledby="decision-title">
             <div className="section-header"><h2 id="decision-title">{view === 'story' ? 'What will you do?' : 'Your journey continues'}</h2></div>
             <div className="choice-list">{view !== 'story' ? <button className="retro-button choice-button" onClick={() => setView('story')}><img src={choiceArrow} alt="" /><span>Return to your story</span></button> : <>
+              {operation && <p className="decision-hint" role="status">{operation}</p>}
+              {pending && <p className="decision-hint pending-hint">{adventure.phase.kind === 'pending-opening'
+                ? 'Your opening is saved and ready to continue.'
+                : adventure.phase.kind === 'pending-summary'
+                  ? 'The scene is saved. Finish the story memory update to continue.'
+                  : 'Your selected action is saved. Other choices are unavailable until it is resolved.'}</p>}
+              {adventure?.phase.kind === 'pending-narration' && <p className="pending-roll-summary" aria-label="Saved roll summary">
+                {adventure.phase.check.difficulty} · {adventure.phase.check.attribute} {formatAttributeValue(adventure.phase.check.attributeValue)} ·
+                D100 {adventure.phase.check.roll} / {adventure.phase.check.threshold} ·
+                {adventure.phase.check.outcome === 'success' ? 'Success' : 'Failure'}
+              </p>}
+              {pending && <button className="retro-button retry-button" disabled={busy} onClick={retry}>
+                {adventure.phase.kind === 'pending-opening' ? 'Retry opening' : adventure.phase.kind === 'pending-summary' ? 'Retry memory update' : 'Retry selected action'}
+              </button>}
               {current?.choices.map((choice) => <button key={choice.id} className="retro-button choice-button" data-choice-id={choice.id}
                 disabled={busy || pending} onClick={() => { void runOperation(() => window.mindtraveller.submitChoice(current.id, choice.id).then((result) => result.adventure), 'Continuing your story…'); }}>
                 <img src={choiceArrow} alt="" /><span>{choice.text}</span></button>)}
               {!current && <p className="decision-hint">{loading ? 'Opening your storybook…' : 'Start a story to discover your first choices.'}</p>}
-              {pending && <button className="retro-button retry-button" disabled={busy} onClick={retry}>Continue saved operation</button>}
             </>}</div>
           </section>
         </div>
