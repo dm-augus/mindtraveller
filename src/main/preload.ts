@@ -6,6 +6,8 @@ import type {
   AppInfo,
   NewStoryRequest,
   NewStoryResolution,
+  ModelOption,
+  ProviderKind,
   ProviderConfiguration,
   ProviderSettings
 } from '../shared/types';
@@ -18,6 +20,8 @@ contextBridge.exposeInMainWorld('mindtraveller', {
     ipcRenderer.invoke('settings:save', configuration),
   setOpenAiKey: (key: string, persist: boolean): Promise<{ persisted: boolean }> =>
     ipcRenderer.invoke('settings:set-openai-key', key, persist),
+  listProviderModels: (provider: ProviderKind, address: string | null): Promise<ModelOption[]> =>
+    ipcRenderer.invoke('settings:list-models', provider, address),
   requestNewStory: (): Promise<NewStoryRequest> => ipcRenderer.invoke('story:new-request'),
   resolveNewStory: (confirmationId: string, decision: 'Yes' | 'No'): Promise<NewStoryResolution> =>
     ipcRenderer.invoke('story:new-resolve', confirmationId, decision),

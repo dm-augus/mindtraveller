@@ -110,9 +110,22 @@ test('local stub covers model discovery and all four story operations', async (t
   for (const call of seen) {
     assert.equal(call.model, 'story-model');
     assert.equal(call.stream, false);
-    assert.equal(call.format, 'json');
+    assert.equal(typeof call.format, 'object');
     assert.deepEqual(call.messages.map((message) => message.role), ['system', 'user']);
   }
+  assert.deepEqual(seen[0].format.required, ['premise', 'narrative', 'choices']);
+  assert.equal(seen[0].format.additionalProperties, false);
+  assert.equal(seen[0].format.properties.choices.minItems, 3);
+  assert.equal(seen[0].format.properties.choices.maxItems, 3);
+  assert.deepEqual(seen[0].format.properties.choices.items.required, ['id', 'text']);
+  assert.deepEqual(seen[1].format.oneOf.map((branch) => branch.properties.kind.const), ['no-check', 'check']);
+  assert.equal(seen[1].format.oneOf[0].properties.choices.maxItems, 3);
+  assert.ok(seen[1].format.oneOf[1].properties.difficulty.enum.includes('Hard'));
+  assert.ok(seen[1].format.oneOf[1].properties.attribute.enum.includes('Strength'));
+  assert.equal(seen[2].format.properties.outcome.const, 'success');
+  assert.equal(seen[2].format.properties.choices.minItems, 3);
+  assert.deepEqual(seen[3].format.required, ['text', 'keyFacts', 'unresolvedThreads']);
+  assert.equal(seen[3].format.properties.keyFacts.items.type, 'string');
   assert.match(seen[0].messages[0].content, /D100 rules/);
   assert.deepEqual(JSON.parse(seen[2].messages[1].content).check, check);
 });
@@ -163,4 +176,23 @@ test('server failures and malformed model output have distinct error types', asy
     modelId: 'story-model', theme: 'Horror', character, rules: 'D100 rules',
     paragraphTarget: 2, choiceTarget: 3
   }), expectProviderCode('invalid-provider-response'));
+});
+
+test('a response violating the opening contract still retries and fails safely', async (t) => {
+  let attempts = 0;
+  const { address } = await stubServer(t, async (_request, response) => {
+    attempts += 1;
+    sendJson(response, 200, {
+      model: 'story-model', done: true,
+      message: { role: 'assistant', content: JSON.stringify({
+        id: 1, text: 'A story.', choices: [{ id: 1, text: 'Go.' }]
+      }) }
+    });
+  });
+  const adapter = new OllamaAdapter(address);
+  await assert.rejects(adapter.generateOpening({
+    modelId: 'story-model', theme: 'Horror', character, rules: 'D100 rules',
+    paragraphTarget: 2, choiceTarget: 3
+  }), expectProviderCode('invalid-provider-response'));
+  assert.equal(attempts, 3);
 });

@@ -16,6 +16,7 @@ import {
   type SummaryResponse
 } from '../../shared/provider-contract';
 import { ProviderError } from '../../shared/provider-error';
+import { ATTRIBUTE_NAMES, DIFFICULTY_BASE_THRESHOLDS } from '../../shared/rules';
 import type { ModelOption } from '../../shared/types';
 import { withResponseRetries } from './response-retries';
 import {
@@ -65,6 +66,44 @@ function chatContent(value: unknown): unknown {
     throw new ProviderContractError('Ollama returned invalid JSON content.');
   }
 }
+
+const textField = { type: 'string', minLength: 1 };
+
+function objectSchema(properties: Record<string, unknown>): object {
+  return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
+}
+
+function choicesField(count: number): object {
+  return {
+    type: 'array', minItems: count, maxItems: count,
+    items: objectSchema({ id: textField, text: textField })
+  };
+}
+
+function openingSchema(choiceTarget: number): object {
+  return objectSchema({ premise: textField, narrative: textField, choices: choicesField(choiceTarget) });
+}
+
+function assessmentSchema(choiceTarget: number): object {
+  return { oneOf: [
+    objectSchema({ kind: { const: 'no-check' }, narrative: textField, choices: choicesField(choiceTarget) }),
+    objectSchema({
+      kind: { const: 'check' },
+      difficulty: { type: 'string', enum: Object.keys(DIFFICULTY_BASE_THRESHOLDS) },
+      attribute: { type: 'string', enum: ATTRIBUTE_NAMES }
+    })
+  ] };
+}
+
+function narrationSchema(choiceTarget: number, outcome: 'success' | 'failure'): object {
+  return objectSchema({ outcome: { const: outcome }, narrative: textField, choices: choicesField(choiceTarget) });
+}
+
+const summarySchema = objectSchema({
+  text: textField,
+  keyFacts: { type: 'array', items: textField },
+  unresolvedThreads: { type: 'array', items: textField }
+});
 
 export class OllamaAdapter implements StoryProvider {
   readonly kind = 'ollama' as const;
@@ -141,34 +180,34 @@ export class OllamaAdapter implements StoryProvider {
     return parseModelOptions(models);
   }
 
-  private async chat<T>(model: string, messages: ProviderMessage[], parse: (content: unknown) => T): Promise<T> {
+  private async chat<T>(model: string, messages: ProviderMessage[], format: object, parse: (content: unknown) => T): Promise<T> {
     return withResponseRetries(this.kind, async () => {
       const response = await this.request('/api/chat', {
         model: modelId(model),
         messages,
         stream: false,
-        format: 'json'
+        format
       });
       return parse(chatContent(response));
     });
   }
 
   async generateOpening(request: OpeningRequest): Promise<OpeningResponse> {
-    return this.chat(request.modelId, openingMessages(request),
+    return this.chat(request.modelId, openingMessages(request), openingSchema(request.choiceTarget),
       (content) => parseOpeningResponse(content, request.choiceTarget));
   }
 
   async assessAction(request: ActionAssessmentRequest): Promise<ActionAssessmentResponse> {
-    return this.chat(request.modelId, assessmentMessages(request),
+    return this.chat(request.modelId, assessmentMessages(request), assessmentSchema(request.choiceTarget),
       (content) => parseActionAssessmentResponse(content, request.choiceTarget, request.attributes));
   }
 
   async narrateCheck(request: CheckedNarrationRequest): Promise<CheckedNarrationResponse> {
-    return this.chat(request.modelId, checkedNarrationMessages(request),
+    return this.chat(request.modelId, checkedNarrationMessages(request), narrationSchema(request.choiceTarget, request.check.outcome),
       (content) => parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome));
   }
 
   async summarize(request: SummaryRequest): Promise<SummaryResponse> {
-    return this.chat(request.modelId, summaryMessages(request), parseSummaryResponse);
+    return this.chat(request.modelId, summaryMessages(request), summarySchema, parseSummaryResponse);
   }
 }

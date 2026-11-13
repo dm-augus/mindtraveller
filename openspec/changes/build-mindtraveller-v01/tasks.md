@@ -44,8 +44,8 @@
 - [x] 7.1 Build the retro shell, sidebar, story scroll area, decision panel, status bar, and Quit action using the prototype and `src/assets/reference/` as visual references and suitable graphics from `src/assets/branding/`, `src/assets/icons/`, and `src/assets/ui/`; keep labels and controls live, and verify the screens and bundled images render in the Windows app at normal and smaller window sizes.
 - [x] 7.2 Build New Story setup for theme, allocation method and values, name, gender, and Good/Neutral/Bad Nature; verify invalid allocations cannot advance and a valid setup starts generation.
 - [x] 7.3 Build story and choice interaction with pending, retry, and visible difficulty/attribute/roll/threshold/outcome states; verify the checked and no-check flows with a stub provider.
-- [ ] 7.4 Build Rules and Settings views, including character details, model selection, protected key entry, and provider errors; verify navigation preserves the active story and no full saved key is displayed.
-- [ ] 7.5 Build restore and New Story confirmation UI; verify reopening restores the last adventure and selecting No leaves it unchanged.
+- [x] 7.4 Build Rules and Settings views, including character details, model selection, protected key entry, and provider errors; verify navigation preserves the active story and no full saved key is displayed.
+- [x] 7.5 Build restore and New Story confirmation UI; verify reopening restores the last adventure and selecting No leaves it unchanged.
 
 ## 8. Integrated Windows release check
 

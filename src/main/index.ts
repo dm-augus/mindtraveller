@@ -6,6 +6,8 @@ import { AdventureStore } from './adventure-storage';
 import { NewStoryController } from './new-story';
 import { ProviderSettingsStore } from './provider-settings';
 import { selectStoryProvider } from './providers/active-provider';
+import { OllamaAdapter } from './providers/ollama';
+import { OpenAiAdapter } from './providers/openai';
 import { StoryController } from './story-controller';
 
 const rendererPath = path.join(__dirname, '../renderer/index.html');
@@ -80,6 +82,14 @@ ipcMain.handle('settings:save', (event, ...args: unknown[]) => {
 ipcMain.handle('settings:set-openai-key', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 2);
   return settingsStore().setOpenAiKey(args[0], args[1]);
+});
+
+ipcMain.handle('settings:list-models', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 2);
+  const [provider, address] = args;
+  if (provider === 'ollama' && typeof address === 'string') return new OllamaAdapter(address).listModels();
+  if (provider === 'openai' && address === null) return new OpenAiAdapter(settingsStore()).listModels();
+  throw new TypeError('Select a valid provider and server address.');
 });
 
 ipcMain.handle('story:new-request', (event, ...args: unknown[]) => {

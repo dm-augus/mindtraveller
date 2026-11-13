@@ -5,6 +5,8 @@ import type {
   AppInfo,
   NewStoryRequest,
   NewStoryResolution,
+  ModelOption,
+  ProviderKind,
   ProviderConfiguration,
   ProviderSettings
 } from '../shared/types';
@@ -19,6 +21,7 @@ declare global {
       getProviderSettings(): Promise<ProviderSettings>;
       saveProviderConfiguration(configuration: ProviderConfiguration): Promise<ProviderSettings>;
       setOpenAiKey(key: string, persist: boolean): Promise<{ persisted: boolean }>;
+      listProviderModels(provider: ProviderKind, address: string | null): Promise<ModelOption[]>;
       requestNewStory(): Promise<NewStoryRequest>;
       resolveNewStory(confirmationId: string, decision: 'Yes' | 'No'): Promise<NewStoryResolution>;
       startOpening(setup: CharacterSetup): Promise<Adventure>;

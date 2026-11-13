@@ -12,6 +12,7 @@ app.disableHardwareAcceleration();
 let userData;
 let providerServer;
 let openingRequests = 0;
+let failOpeningOnce = false;
 let checkedAssessments = 0;
 let simpleAssessments = 0;
 const narratedChecks = [];
@@ -287,8 +288,50 @@ async function checkWindow(window, store) {
 
   for (const view of ['rules', 'settings', 'new-story']) {
     await evaluate((name) => document.querySelector(`[data-view="${name}"]`).click(), view);
+    if (view === 'new-story') {
+      await waitFor(() => Boolean(document.querySelector('[role="alertdialog"]')));
+      assert.equal(await evaluate(() => document.querySelector('.app-shell').dataset.currentView), 'story');
+      await capture('shell-new-story-confirm-760');
+      await evaluate(() => document.querySelector('.confirmation-actions button:first-child').click());
+      await waitFor(() => !document.querySelector('[role="alertdialog"]'));
+      assert.equal(await evaluate(() => document.querySelector('.app-shell').dataset.currentView), 'story');
+      assert.equal(await fs.readFile(store.activePath, 'utf8'), bytes);
+      assert.deepEqual(await store.load(), saved);
+      continue;
+    }
     await waitFor(() => document.querySelector('.app-shell').dataset.currentView !== 'story');
     assert.equal(await evaluate(() => document.querySelector('.app-shell').dataset.currentView), view);
+    if (view === 'rules') {
+      const details = await evaluate(() => document.querySelector('[aria-label="Active character"]').textContent);
+      for (const expected of ['Mira', 'Woman', 'Good', 'Strength', 'Luck']) assert.ok(details.includes(expected));
+    }
+    if (view === 'settings') {
+      await evaluate(() => document.querySelector('.settings-content button[type="button"]').click());
+      await waitFor(() => Boolean(document.querySelector('.settings-content select option[value="smoke-model"]'))
+        && document.querySelector('.settings-content button[type="button"]').disabled === false);
+      await evaluate(() => {
+        const field = document.querySelector('.settings-content select');
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(field, 'alternate-model');
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await evaluate(() => document.querySelector('.settings-content button[type="submit"]').click());
+      await waitFor(() => Boolean(document.querySelector('.settings-feedback, .settings-error')));
+      assert.match(await evaluate(() => document.querySelector('.settings-feedback, .settings-error').textContent), /saved/i);
+      assert.equal((await new ProviderSettingsStore(userData, safeStorage).getPublicSettings()).ollama.modelId, 'alternate-model');
+      await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
+      await evaluate(() => {
+        const field = document.querySelector('input[type="password"]');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'sk-smoke-secret');
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('.settings-check input').click();
+      });
+      await evaluate(() => document.querySelector('input[name="provider"][value="ollama"]').click());
+      await evaluate(() => document.querySelector('.settings-content button[type="submit"]').click());
+      await waitFor(() => document.querySelector('.settings-feedback')?.textContent.includes('session only'));
+      assert.equal(await evaluate(() => document.querySelector('.settings-content').textContent.includes('sk-smoke-secret')), false);
+      await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
+      assert.equal(await evaluate(() => document.querySelector('input[type="password"]').value), '');
+    }
     window.setSize(760, 520);
     await settle();
     await layout();
@@ -298,6 +341,36 @@ async function checkWindow(window, store) {
     assert.equal(await evaluate(() => document.querySelectorAll('[data-segment-id]').length), saved.segments.length);
   }
   assert.equal(await fs.readFile(store.activePath, 'utf8'), bytes);
+  await evaluate(() => document.querySelector('[data-view="new-story"]').click());
+  await waitFor(() => Boolean(document.querySelector('[role="alertdialog"]')));
+  await evaluate(() => document.querySelector('.confirmation-actions button:last-child').click());
+  await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'new-story'
+    && !document.querySelector('[role="alertdialog"]'));
+  assert.equal(await store.load(), null);
+  assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
+  await capture('shell-new-story-after-confirm-760');
+
+  const pendingOpening = structuredClone(saved);
+  pendingOpening.premise = null;
+  pendingOpening.segments = [];
+  pendingOpening.phase = { kind: 'pending-opening', turnId: 'smoke-opening' };
+  await store.save(pendingOpening);
+  failOpeningOnce = true;
+  const openingReloaded = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload();
+  await openingReloaded;
+  await ready();
+  await evaluate(() => document.querySelector('.retry-button').click());
+  await waitFor(() => Boolean(document.querySelector('.pending-error'))
+    && !document.querySelector('.retry-button').disabled);
+  assert.match(await evaluate(() => document.querySelector('.pending-error').textContent), /Ollama could not complete/);
+  assert.equal(await evaluate(() => {
+    const panel = document.querySelector('.choice-list').getBoundingClientRect();
+    const retry = document.querySelector('.retry-button').getBoundingClientRect();
+    return retry.top >= panel.top && retry.bottom <= panel.bottom;
+  }), true);
+  assert.equal((await store.load()).phase.kind, 'pending-opening');
+  await capture('shell-opening-error-760');
 
   const pending = structuredClone(saved);
   pending.segments.at(-1).selectedChoiceId = 'merchant';
@@ -333,6 +406,13 @@ void (async () => {
   userData = await fs.mkdtemp(path.join(output, 'profile-'));
   app.setPath('userData', userData);
   providerServer = http.createServer(async (request, response) => {
+    if (request.url === '/api/tags') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ models: [
+        { model: 'smoke-model', name: 'smoke-model' }, { model: 'alternate-model', name: 'alternate-model' }
+      ] }));
+      return;
+    }
     if (request.url !== '/api/chat') { response.writeHead(404).end(); return; }
     let raw = '';
     for await (const chunk of request) raw += chunk;
@@ -345,6 +425,7 @@ void (async () => {
     ];
     let content;
     if (prompt.operation === 'opening') {
+      if (failOpeningOnce) { failOpeningOnce = false; response.writeHead(503).end(); return; }
       assert.equal(prompt.theme, 'Horror');
       assert.equal(prompt.character.name, 'Aveline');
       openingRequests += 1;

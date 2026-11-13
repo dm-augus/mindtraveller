@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Adventure, CheckRecord, ProviderSettings } from '../shared/types';
+import type { Adventure, CheckRecord, NewStoryRequest, ProviderSettings } from '../shared/types';
 import type { CharacterSetup } from '../shared/character-rules';
-import { RULES_SECTIONS } from '../shared/rules-reference';
 import { NewStorySetup } from './NewStorySetup';
+import { RulesView } from './RulesView';
+import { SettingsView } from './SettingsView';
 import diceArtwork from '../assets/branding/dice_artwork.png';
 import newStoryIcon from '../assets/icons/new_story_transparent.png';
 import rulesIcon from '../assets/icons/rules_transparent.png';
@@ -99,8 +100,12 @@ export function App(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [operation, setOperation] = useState('');
   const [error, setError] = useState('');
+  const [confirmation, setConfirmation] = useState<Extract<NewStoryRequest, { kind: 'confirmation-required' }> | null>(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
   const inFlight = useRef(false);
+  const confirmationFocus = useRef<HTMLButtonElement>(null);
   const storyScroll = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (confirmation) confirmationFocus.current?.focus(); }, [confirmation]);
   useEffect(() => { storyScroll.current?.scrollTo({ top: 0 }); }, [view]);
   useEffect(() => {
     if (view !== 'story' || !adventure) return;
@@ -155,6 +160,39 @@ export function App(): React.JSX.Element {
     }, 'Opening your story…');
   }
 
+  async function requestNewStory(): Promise<void> {
+    if (inFlight.current || loading || confirmationBusy || confirmation) return;
+    setConfirmationBusy(true); setError('');
+    try {
+      const request = await window.mindtraveller.requestNewStory();
+      if (request.kind === 'confirmation-required') setConfirmation(request);
+      else setView('new-story');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Unable to prepare a new story. Try again.');
+    } finally { setConfirmationBusy(false); }
+  }
+
+  async function resolveNewStory(decision: 'Yes' | 'No'): Promise<void> {
+    if (!confirmation || confirmationBusy) return;
+    setConfirmationBusy(true); setError('');
+    try {
+      const result = await window.mindtraveller.resolveNewStory(confirmation.confirmationId, decision);
+      if (result.kind === 'continue-adventure') {
+        setAdventure(result.adventure);
+        setView('story');
+      } else {
+        setAdventure(null);
+        setView('new-story');
+      }
+      setConfirmation(null);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Unable to change stories. Try again.');
+      try { setAdventure(await window.mindtraveller.restoreAdventure()); } catch { /* Keep the last visible story. */ }
+      setConfirmation(null);
+      setView('story');
+    } finally { setConfirmationBusy(false); }
+  }
+
   async function quit(): Promise<void> {
     try { await window.mindtraveller.quit(); }
     catch { setError('Unable to close the application. Try Quit again.'); }
@@ -162,7 +200,7 @@ export function App(): React.JSX.Element {
 
   const current = adventure?.segments.at(-1);
   const pending = adventure !== null && adventure.phase.kind !== 'ready';
-  const busy = loading || Boolean(operation);
+  const busy = loading || Boolean(operation) || confirmationBusy;
   const providerLabel = settings ? (settings.activeProvider === 'ollama' ? 'Ollama' : 'OpenAI') : 'Storyteller';
   const model = settings?.[settings.activeProvider].modelId;
   return (
@@ -173,7 +211,9 @@ export function App(): React.JSX.Element {
           <div className="branding-frame"><img className="dice-artwork" src={diceArtwork} alt="A twenty-sided die surrounded by violet flames" /></div>
           <nav className="main-navigation" aria-label="Main navigation">{NAVIGATION.map((item) => (
             <button key={item.view} className={`retro-button nav-button${view === item.view ? ' is-selected' : ''}`}
-              aria-current={view === item.view ? 'page' : undefined} data-view={item.view} onClick={() => setView(item.view)}>
+              aria-current={view === item.view ? 'page' : undefined} data-view={item.view}
+              disabled={item.view === 'new-story' && busy}
+              onClick={() => { if (item.view === 'new-story') void requestNewStory(); else setView(item.view); }}>
               <img src={item.icon} alt="" /><span>{item.label}</span>
             </button>
           ))}</nav>
@@ -187,15 +227,13 @@ export function App(): React.JSX.Element {
             <div className="section-header"><h2 id="view-title">{VIEW_TITLES[view]}</h2>
               {view !== 'story' && <button className="return-story" data-action="return-story" onClick={() => setView('story')}>Return to story</button>}
               {view === 'story' && current && <span className="chapter-label">Chapter {current.chapterNumber}</span>}</div>
-            {error && <div className="error-banner" role="alert">{error}</div>}
+            {error && !(view === 'story' && adventure?.phase.kind === 'pending-opening') &&
+              <div className="error-banner" role="alert">{error}</div>}
             <div className="story-scroll" ref={storyScroll} tabIndex={0} aria-label={VIEW_TITLES[view]}>
-              {view === 'story' && <StoryContent adventure={adventure} onNewStory={() => setView('new-story')} />}
+              {view === 'story' && <StoryContent adventure={adventure} onNewStory={() => { void requestNewStory(); }} />}
               {view === 'new-story' && <NewStorySetup busy={busy} onStart={startStory} />}
-              {view === 'rules' && <div className="rules-content">{RULES_SECTIONS.map((section) => <section key={section.heading}><h3>{section.heading}</h3><p>{section.text}</p></section>)}</div>}
-              {view === 'settings' && <div className="page-introduction"><p className="eyebrow">The voice behind your adventure</p><h2>Your storyteller</h2>
-                <p>Stories can be told by a local Ollama model or an OpenAI model.</p>
-                <dl className="settings-summary"><dt>Active provider</dt><dd>{providerLabel}</dd><dt>Selected model</dt><dd>{model ?? 'No model selected'}</dd>
-                  <dt>OpenAI key</dt><dd>{settings?.openai.hasSavedKey ? 'Saved securely' : 'No saved key'}</dd></dl></div>}
+              {view === 'rules' && <RulesView adventure={adventure} />}
+              {view === 'settings' && <SettingsView settings={settings} onSaved={setSettings} />}
             </div>
           </section>
           <section className="decision-panel inset-panel" aria-labelledby="decision-title">
@@ -207,6 +245,7 @@ export function App(): React.JSX.Element {
                 : adventure.phase.kind === 'pending-summary'
                   ? 'The scene is saved. Finish the story memory update to continue.'
                   : 'Your selected action is saved. Other choices are unavailable until it is resolved.'}</p>}
+              {adventure?.phase.kind === 'pending-opening' && error && <p className="pending-error" role="alert">{error}</p>}
               {adventure?.phase.kind === 'pending-narration' && <p className="pending-roll-summary" aria-label="Saved roll summary">
                 {adventure.phase.check.difficulty} · {adventure.phase.check.attribute} {formatAttributeValue(adventure.phase.check.attributeValue)} ·
                 D100 {adventure.phase.check.roll} / {adventure.phase.check.threshold} ·
@@ -218,7 +257,7 @@ export function App(): React.JSX.Element {
               {current?.choices.map((choice) => <button key={choice.id} className="retro-button choice-button" data-choice-id={choice.id}
                 disabled={busy || pending} onClick={() => { void runOperation(() => window.mindtraveller.submitChoice(current.id, choice.id).then((result) => result.adventure), 'Continuing your story…'); }}>
                 <img src={choiceArrow} alt="" /><span>{choice.text}</span></button>)}
-              {!current && <p className="decision-hint">{loading ? 'Opening your storybook…' : 'Start a story to discover your first choices.'}</p>}
+              {!current && !pending && <p className="decision-hint">{loading ? 'Opening your storybook…' : 'Start a story to discover your first choices.'}</p>}
             </>}</div>
           </section>
         </div>
@@ -226,6 +265,29 @@ export function App(): React.JSX.Element {
       <footer className="statusbar"><div className="status-message" role="status"><img src={bookIcon} alt="" /><span>{operation || (loading ? 'Opening your storybook…' : statusText(adventure))}</span></div>
         <span className="provider-status" title={model ?? 'No model selected'}>{providerLabel} · {model ?? 'No model selected'}</span>
         <span className="version">Mindtraveller {version ? `v${version}` : '—'}</span></footer>
+      {confirmation && <div className="modal-backdrop"><section className="confirmation-dialog" role="alertdialog" aria-modal="true"
+        aria-labelledby="confirmation-title" aria-describedby="confirmation-description"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.preventDefault(); void resolveNewStory('No'); }
+          if (event.key === 'Tab') {
+            const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+            if (buttons.length < 2) return;
+            if (event.shiftKey && document.activeElement === buttons[0]) {
+              event.preventDefault(); buttons[buttons.length - 1].focus();
+            } else if (!event.shiftKey && document.activeElement === buttons[buttons.length - 1]) {
+              event.preventDefault(); buttons[0].focus();
+            }
+          }
+        }}>
+        <div className="section-header"><h2 id="confirmation-title">Start a new story?</h2></div>
+        <div className="confirmation-body"><p id="confirmation-description">This will replace your saved adventure. Do you want to continue?</p>
+          <div className="confirmation-actions">
+            <button ref={confirmationFocus} className="retro-button" type="button" disabled={confirmationBusy}
+              onClick={() => { void resolveNewStory('No'); }}>No, keep my story</button>
+            <button className="retro-button" type="button" disabled={confirmationBusy}
+              onClick={() => { void resolveNewStory('Yes'); }}>Yes, start a new story</button>
+          </div></div>
+      </section></div>}
     </main>
   );
 }
