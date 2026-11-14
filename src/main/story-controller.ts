@@ -55,6 +55,7 @@ export class StoryController {
         schemaVersion: 1,
         id: randomUUID(),
         theme: setup.value.theme,
+        language: setup.value.language,
         character: setup.value.character,
         premise: null,
         segments: [],

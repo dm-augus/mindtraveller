@@ -11,6 +11,7 @@ import settingsIcon from '../assets/icons/settings_transparent.png';
 import quitIcon from '../assets/icons/quit_transparent.png';
 import bookIcon from '../assets/icons/status_book_transparent.png';
 import choiceArrow from '../assets/icons/choice_arrow_transparent.png';
+import { LANGUAGE_LABELS } from '../shared/story-language';
 
 type View = 'story' | 'new-story' | 'rules' | 'settings';
 const NAVIGATION = [
@@ -226,7 +227,8 @@ export function App(): React.JSX.Element {
           <section className="story-panel inset-panel" aria-labelledby="view-title">
             <div className="section-header"><h2 id="view-title">{VIEW_TITLES[view]}</h2>
               {view !== 'story' && <button className="return-story" data-action="return-story" onClick={() => setView('story')}>Return to story</button>}
-              {view === 'story' && current && <span className="chapter-label">Chapter {current.chapterNumber}</span>}</div>
+              {view === 'story' && adventure && <span className="chapter-label" aria-label="Adventure language">
+                {current && `Chapter ${current.chapterNumber} · `}{LANGUAGE_LABELS[adventure.language]}</span>}</div>
             {error && !(view === 'story' && adventure?.phase.kind === 'pending-opening') &&
               <div className="error-banner" role="alert">{error}</div>}
             <div className="story-scroll" ref={storyScroll} tabIndex={0} aria-label={VIEW_TITLES[view]}>

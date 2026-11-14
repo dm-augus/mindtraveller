@@ -2,9 +2,9 @@
 
 ## 1. Adventure language and compatible persistence
 
-- [ ] 1.1 Add validated `en` / `pt-BR` language to shared adventure and creation contracts; implement legacy missing-language normalization for active/backup reads and compare-and-save; verify storage tests cover old saves, invalid explicit values, ordinary saves, backup recovery, and every pending phase without changed rolls or lost history.
-- [ ] 1.2 Implement versioned local default-language preferences with named, validated preload/IPC operations and queued temporary writes; verify tests cover English defaults, persistence across restart, invalid input, write failures, and independence from adventure/provider data.
-- [ ] 1.3 Add the English / Português button selector to New Story and the shared next-story preference to Settings; snapshot language before opening generation and display it read-only in active story metadata; verify keyboard selection, saved defaults, failure feedback, and that changing the default never mutates the current adventure or bypasses replacement confirmation.
+- [x] 1.1 Add validated `en` / `pt-BR` language to shared adventure and creation contracts; implement legacy missing-language normalization for active/backup reads and compare-and-save; verify storage tests cover old saves, invalid explicit values, ordinary saves, backup recovery, and every pending phase without changed rolls or lost history.
+- [x] 1.2 Implement versioned local default-language preferences with named, validated preload/IPC operations and queued temporary writes; verify tests cover English defaults, persistence across restart, invalid input, write failures, and independence from adventure/provider data.
+- [x] 1.3 Add the English / Português button selector to New Story and the shared next-story preference to Settings; snapshot language before opening generation and display it read-only in active story metadata; verify keyboard selection, saved defaults, failure feedback, and that changing the default never mutates the current adventure or bypasses replacement confirmation.
 
 ## 2. Language-aware generation
 

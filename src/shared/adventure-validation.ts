@@ -2,6 +2,7 @@ import { createCheckRecord, type CheckSelection } from './action-rules';
 import { validateCharacterSetup } from './character-rules';
 import { ATTRIBUTE_NAMES } from './rules';
 import type { Adventure } from './types';
+import { isStoryLanguage } from './story-language';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -102,10 +103,11 @@ export function isAdventure(value: unknown): value is Adventure {
   if (!isRecord(character.attributes) || !hasOnlyKeys(character.attributes, ATTRIBUTE_NAMES)) return false;
 
   const validShape = hasOnlyKeys(value, [
-    'schemaVersion', 'id', 'theme', 'character', 'premise', 'segments',
+    'schemaVersion', 'id', 'theme', 'language', 'character', 'premise', 'segments',
     'chapterSummaries', 'globalSummary', 'phase', 'updatedAt'
   ])
     && value.schemaVersion === 1
+    && isStoryLanguage(value.language)
     && isText(value.id)
     && validateCharacterSetup({ theme: value.theme, character: value.character }).valid
     && (value.premise === null || typeof value.premise === 'string')

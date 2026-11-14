@@ -22,7 +22,7 @@ const validCheck: CheckRecord = {
 
 const validAdventure: Adventure = {
   schemaVersion: 1,
-  id: 'adventure-1',
+  language: 'en', id: 'adventure-1',
   theme: 'High Fantasy',
   character: {
     name: 'Mira',

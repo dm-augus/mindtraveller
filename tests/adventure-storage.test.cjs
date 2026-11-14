@@ -20,7 +20,7 @@ async function temporaryUserData(t) {
 function adventure(id) {
   return {
     schemaVersion: 1,
-    id,
+    language: 'en', id,
     theme: 'High Fantasy',
     character: {
       name: 'Mira',

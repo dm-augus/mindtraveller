@@ -29,7 +29,7 @@ function adventure(chapters = 60) {
     });
   }
   return {
-    schemaVersion: 1, id: 'long-adventure', theme: 'Horror',
+    schemaVersion: 1, language: 'en', id: 'long-adventure', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }

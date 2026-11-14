@@ -1,4 +1,5 @@
 import type { CharacterSetup } from '../shared/character-rules';
+import type { StoryPreferences } from '../shared/types';
 import type {
   Adventure,
   ChoiceTurnResult,
@@ -16,6 +17,8 @@ export {};
 declare global {
   interface Window {
     mindtraveller: {
+      getStoryPreferences(): Promise<StoryPreferences>;
+      saveStoryPreferences(preferences: StoryPreferences): Promise<StoryPreferences>;
       getAppInfo(): Promise<AppInfo>;
       quit(): Promise<void>;
       getProviderSettings(): Promise<ProviderSettings>;

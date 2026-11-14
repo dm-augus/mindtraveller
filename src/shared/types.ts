@@ -1,4 +1,6 @@
 export type Theme = 'Horror' | 'Romance' | 'High Fantasy';
+export type StoryLanguage = 'en' | 'pt-BR';
+export interface StoryPreferences { defaultStoryLanguage: StoryLanguage }
 export type Nature = 'Good' | 'Neutral' | 'Bad';
 export type AllocationMethod = 'Balanced' | 'Simplified';
 
@@ -71,6 +73,7 @@ export type AdventurePhase =
   | { kind: 'pending-summary'; turnId: string; chapterNumber: number };
 
 export interface Adventure {
+  language: StoryLanguage;
   schemaVersion: 1;
   id: string;
   theme: Theme;

@@ -19,7 +19,7 @@ const choices = [
 
 function adventure() {
   return {
-    schemaVersion: 1, id: 'adventure-1', theme: 'Horror',
+    schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }

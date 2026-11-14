@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { StoryLanguageSelector } from './StoryLanguageSelector';
 import type { ModelOption, ProviderConfiguration, ProviderKind, ProviderSettings } from '../shared/types';
 
 interface Props {
@@ -74,6 +75,7 @@ export function SettingsView({ settings, onSaved }: Props): React.JSX.Element {
   return <form className="settings-content" onSubmit={(event) => { void save(event); }}>
     <div className="page-introduction"><p className="eyebrow">The voice behind your adventure</p>
       <h2>Your storyteller</h2><p>Choose the provider and model used for new story and memory operations.</p></div>
+    <StoryLanguageSelector disabled={busy} />
     <fieldset className="setup-group"><legend>Provider</legend>
       <div className="setup-options method-options">{(['ollama', 'openai'] as const).map((option) =>
         <label key={option} className={`setup-option${provider === option ? ' is-selected' : ''}`}>

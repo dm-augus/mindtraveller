@@ -9,6 +9,11 @@ import { selectStoryProvider } from './providers/active-provider';
 import { OllamaAdapter } from './providers/ollama';
 import { OpenAiAdapter } from './providers/openai';
 import { StoryController } from './story-controller';
+import { StoryPreferencesStore } from './story-preferences';
+let activeStoryPreferences: StoryPreferencesStore | null = null;
+function preferencesStore(): StoryPreferencesStore {
+  return activeStoryPreferences ??= new StoryPreferencesStore(app.getPath('userData'));
+}
 
 const rendererPath = path.join(__dirname, '../renderer/index.html');
 const rendererUrl = pathToFileURL(rendererPath).href;
@@ -67,6 +72,15 @@ ipcMain.handle('app:get-info', (event, ...args: unknown[]) => {
 ipcMain.handle('app:quit', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   setImmediate(() => app.quit());
+});
+
+ipcMain.handle('preferences:get', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args);
+  return preferencesStore().get();
+});
+ipcMain.handle('preferences:save', (event, ...args: unknown[]) => {
+  assertTrustedRequest(event, args, 1);
+  return preferencesStore().save(args[0]);
 });
 
 ipcMain.handle('settings:get', (event, ...args: unknown[]) => {

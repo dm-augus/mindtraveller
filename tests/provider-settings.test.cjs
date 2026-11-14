@@ -47,7 +47,7 @@ function configuration() {
 function adventure() {
   return {
     schemaVersion: 1,
-    id: 'adventure-1',
+    language: 'en', id: 'adventure-1',
     theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',

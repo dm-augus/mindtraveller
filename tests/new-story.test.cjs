@@ -21,7 +21,7 @@ async function temporaryUserData(t) {
 function adventure(id, narrative = 'The road reaches the gate.') {
   return {
     schemaVersion: 1,
-    id,
+    language: 'en', id,
     theme: 'High Fantasy',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',

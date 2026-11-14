@@ -65,7 +65,7 @@ async function finish(code, error) {
 
 function adventure() {
   return {
-    schemaVersion: 1, id: 'shell-fixture', theme: 'High Fantasy',
+    schemaVersion: 1, language: 'en', id: 'shell-fixture', theme: 'High Fantasy',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
@@ -156,6 +156,20 @@ async function checkWindow(window, store) {
 
   await evaluate(() => document.querySelector('[data-view="new-story"]').click());
   await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'new-story');
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
+  const preferencesPath = path.join(userData, 'mindtraveller', 'preferences.json');
+  await assert.rejects(evaluate(() => window.mindtraveller.saveStoryPreferences({ defaultStoryLanguage: 'fr' })));
+  // Force a real write failure without modifying the user's profile.
+  await fs.mkdir(`${preferencesPath}.tmp`, { recursive: true });
+  await evaluate(() => document.querySelector('input[name="story-language"][value="pt-BR"]').click());
+  await waitFor(() => Boolean(document.querySelector('.language-error')));
+  assert.equal(await evaluate(() => document.querySelector('input[name="story-language"][value="en"]').checked), true);
+  await fs.rmdir(`${preferencesPath}.tmp`);
+  await evaluate(() => document.querySelector('input[name="story-language"][value="en"]').focus());
+  window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Right' });
+  window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Right' });
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="pt-BR"]:checked:not(:disabled)')));
+  assert.equal(JSON.parse(await fs.readFile(preferencesPath, 'utf8')).defaultStoryLanguage, 'pt-BR');
   assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
   await evaluate(() => {
     document.querySelector('input[name="theme"][value="Horror"]').click();
@@ -205,6 +219,8 @@ async function checkWindow(window, store) {
   const generated = await store.load();
   assert.equal(openingRequests, 1);
   assert.equal(generated.theme, 'Horror');
+  assert.equal(generated.language, 'pt-BR');
+  assert.match(await evaluate(() => document.querySelector('[aria-label="Adventure language"]').textContent), /Português/);
   assert.equal(generated.character.name, 'Aveline');
   assert.equal(generated.character.gender, 'Woman');
   assert.equal(generated.character.nature, 'Good');
@@ -292,6 +308,11 @@ async function checkWindow(window, store) {
 
   await evaluate(() => document.querySelector('[data-view="settings"]').click());
   await waitFor(() => Boolean(document.querySelector('.settings-content')));
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="pt-BR"]:checked:not(:disabled)')));
+  const beforePreference = await fs.readFile(store.activePath, 'utf8');
+  await evaluate(() => document.querySelector('input[name="story-language"][value="en"]').click());
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
+  assert.equal(await fs.readFile(store.activePath, 'utf8'), beforePreference);
   await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
   await evaluate(() => {
     const field = document.querySelector('input[type="password"]');
@@ -331,6 +352,7 @@ async function checkWindow(window, store) {
   await evaluate(() => document.querySelector('.retry-button').click());
   await waitFor(() => document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const summarized = await store.load();
+  assert.equal(summarized.language, 'pt-BR');
   assert.equal(summarized.phase.kind, 'ready');
   assert.equal(summarized.segments.length, 10);
   assert.equal(new Set(summarized.segments.map((segment) => segment.id)).size, 10);
@@ -447,6 +469,7 @@ async function checkWindow(window, store) {
     && !document.querySelector('[role="alertdialog"]'));
   assert.equal(await store.load(), null);
   assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
   await capture('shell-new-story-after-confirm-760');
 
   const pendingOpening = structuredClone(saved);

@@ -80,7 +80,7 @@ void (async () => {
   const store = new AdventureStore(profile);
   // Seed only the isolated profile, then verify the installed app finds it on launch.
   const fixture = {
-    schemaVersion: 1, id: 'installed-fixture', theme: 'Horror',
+    schemaVersion: 1, language: 'en', id: 'installed-fixture', theme: 'Horror',
     character: { name: 'Installer Traveller', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
       attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } },
     premise: 'An offline restoration check.', segments: [{ id: 'installed-opening', chapterNumber: 1,

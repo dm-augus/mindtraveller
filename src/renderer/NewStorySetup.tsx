@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { StoryLanguageSelector } from './StoryLanguageSelector';
+import type { StoryLanguage } from '../shared/types';
 import {
   ALLOCATION_METHODS, ATTRIBUTE_NAMES, ATTRIBUTE_RANGES, NATURES, THEMES,
   createInitialAttributes, validateAttributeAllocation, validateCharacterSetup
@@ -19,6 +21,8 @@ interface NewStorySetupProps {
 }
 
 export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.Element {
+  const [language, setLanguage] = useState<StoryLanguage | null>(null);
+  const [preferenceBusy, setPreferenceBusy] = useState(true);
   const [theme, setTheme] = useState<Theme | ''>('');
   const [method, setMethod] = useState<AllocationMethod | ''>('');
   const [attributes, setAttributes] = useState<Attributes>(createInitialAttributes);
@@ -28,6 +32,7 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
 
   const allocation = validateAttributeAllocation(method, attributes);
   const setup = validateCharacterSetup({
+    language,
     theme,
     character: { name, gender, nature, allocationMethod: method, attributes }
   });
@@ -47,7 +52,7 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
 
   function submit(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (!busy && setup.valid) onStart(setup.value);
+    if (!busy && !preferenceBusy && setup.valid) onStart(setup.value);
   }
 
   return <form className="new-story-setup" onSubmit={submit} data-setup-valid={setup.valid}>
@@ -56,6 +61,7 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
       <p>Choose a medieval world, create your traveller, and begin your adventure.</p>
     </div>
 
+    <StoryLanguageSelector disabled={busy} onLanguageChange={setLanguage} onBusyChange={setPreferenceBusy} />
     <fieldset className="setup-group"><legend>Choose your world</legend>
       <div className="setup-options theme-options">{THEMES.map((option) =>
         <label key={option} className={`setup-option${theme === option ? ' is-selected' : ''}`}>
@@ -115,7 +121,7 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
 
     <div className="setup-actions">
       <p>{setup.valid ? 'Your traveller is ready.' : 'Complete every field and match the allocation budget to begin.'}</p>
-      <button className="retro-button setup-start" type="submit" disabled={busy || !setup.valid}>
+      <button className="retro-button setup-start" type="submit" disabled={busy || preferenceBusy || !setup.valid}>
         {busy ? 'Opening your story…' : 'Begin story'}
       </button>
     </div>

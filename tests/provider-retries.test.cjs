@@ -146,7 +146,7 @@ async function temporaryUserData(t) {
 
 function adventure() {
   return {
-    schemaVersion: 1, id: 'adventure-1', theme: 'Horror', character,
+    schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror', character,
     premise: 'A bell sounds under the abbey.',
     segments: [{
       id: 'segment-1', chapterNumber: 1, narrative: 'The gate is locked.', choices,
