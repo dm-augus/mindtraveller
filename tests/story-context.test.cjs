@@ -155,6 +155,7 @@ test('opening requests use shared rules and configured targets with no existing 
   const builder = new StoryContextBuilder({ paragraphTarget: 2, choiceTarget: 4 });
   const request = builder.openingRequest('story-model', saved);
   assert.deepEqual(request, {
+    language: 'en',
     modelId: 'story-model', theme: saved.theme, character: saved.character,
     rules: GAME_RULES_TEXT, paragraphTarget: 2, choiceTarget: 4
   });

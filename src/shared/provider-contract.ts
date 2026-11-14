@@ -10,6 +10,7 @@ import type {
   ModelOption,
   PendingChoice,
   ProviderKind,
+  StoryLanguage,
   Theme
 } from './types';
 
@@ -19,6 +20,7 @@ export interface ModelSelection {
 }
 
 export interface OpeningRequest {
+  language: StoryLanguage;
   modelId: string;
   theme: Theme;
   character: Character;
@@ -34,6 +36,7 @@ export interface OpeningResponse {
 }
 
 export interface ActionAssessmentRequest {
+  language: StoryLanguage;
   modelId: string;
   context: string;
   choice: PendingChoice;
@@ -47,6 +50,7 @@ export type ActionAssessmentResponse =
   | { kind: 'check'; difficulty: DifficultyClass; attribute: AttributeName };
 
 export interface CheckedNarrationRequest {
+  language: StoryLanguage;
   modelId: string;
   context: string;
   choice: PendingChoice;
@@ -62,8 +66,8 @@ export interface CheckedNarrationResponse {
 }
 
 export type SummaryRequest =
-  | { modelId: string; kind: 'chapter'; chapterNumber: number; context: string }
-  | { modelId: string; kind: 'global'; context: string };
+  | { modelId: string; language: StoryLanguage; kind: 'chapter'; chapterNumber: number; context: string }
+  | { modelId: string; language: StoryLanguage; kind: 'global'; context: string };
 
 export interface SummaryResponse {
   text: string;

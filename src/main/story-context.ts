@@ -4,6 +4,7 @@ import type {
   OpeningRequest
 } from '../shared/provider-contract';
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
+import { storyLanguageInstruction } from '../shared/story-language';
 import type { Adventure, Choice, StorySegment } from '../shared/types';
 import { createStoryConfiguration, type StoryConfiguration } from './story-config';
 
@@ -86,6 +87,8 @@ export class StoryContextBuilder {
       return [summary.chapterNumber, boundary?.chapterNumber === summary.chapterNumber ? boundary.index : -1];
     }));
     const context = {
+      language: adventure.language,
+      languageInstruction: storyLanguageInstruction(adventure.language),
       rules: GAME_RULES_TEXT,
       theme: adventure.theme,
       character: adventure.character,
@@ -120,16 +123,17 @@ export class StoryContextBuilder {
     return JSON.stringify(context);
   }
 
-  openingRequest(modelId: string, setup: Pick<Adventure, 'theme' | 'character'>): OpeningRequest {
+  openingRequest(modelId: string, setup: Pick<Adventure, 'theme' | 'character' | 'language'>): OpeningRequest {
     const request: OpeningRequest = {
       modelId,
+      language: setup.language,
       theme: setup.theme,
       character: structuredClone(setup.character),
       rules: GAME_RULES_TEXT,
       paragraphTarget: this.configuration.paragraphTarget,
       choiceTarget: this.configuration.choiceTarget
     };
-    this.requireBudget(JSON.stringify(request));
+    this.requireBudget(JSON.stringify({ ...request, languageInstruction: storyLanguageInstruction(setup.language) }));
     return request;
   }
 
@@ -140,6 +144,7 @@ export class StoryContextBuilder {
     return {
       modelId,
       context: this.build(adventure),
+      language: adventure.language,
       choice: { ...adventure.phase.choice },
       attributes: { ...adventure.character.attributes },
       paragraphTarget: this.configuration.paragraphTarget,
@@ -156,6 +161,7 @@ export class StoryContextBuilder {
       context: this.build(adventure),
       choice: { ...adventure.phase.choice },
       check: { ...adventure.phase.check },
+      language: adventure.language,
       paragraphTarget: this.configuration.paragraphTarget,
       choiceTarget: this.configuration.choiceTarget
     };

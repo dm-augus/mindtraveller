@@ -8,8 +8,8 @@
 
 ## 2. Language-aware generation
 
-- [ ] 2.1 Propagate saved adventure language through opening, assessment, checked narration, chapter/global summary contracts, context builders, and shared prompts; verify both adapter payload tests cover both languages, unchanged JSON/enums, context budget accounting, and the existing instruction to produce new choices after resolving the selected action.
-- [ ] 2.2 Cover controller restore/retry and provider-switch flows with language fixtures; verify pending opening, assessment, narration, and summary use saved adventure language despite default changes, with stable decisions and rolls; document language behavior and legacy English defaults in a short user guide.
+- [x] 2.1 Propagate saved adventure language through opening, assessment, checked narration, chapter/global summary contracts, context builders, and shared prompts; verify both adapter payload tests cover both languages, unchanged JSON/enums, context budget accounting, and the existing instruction to produce new choices after resolving the selected action.
+- [x] 2.2 Cover controller restore/retry and provider-switch flows with language fixtures; verify pending opening, assessment, narration, and summary use saved adventure language despite default changes, with stable decisions and rolls; document language behavior and legacy English defaults in a short user guide.
 
 ## 3. Complete history export
 
