@@ -13,9 +13,9 @@
 
 ## 3. Complete history export
 
-- [ ] 3.1 Add a pure Markdown transcript formatter for full saved history, character, premise, chapters, all choices with selection markers, checks, and a distinct pending-state section; verify long English/Portuguese fixtures preserve accents and all source scenes without duplicate pending selections/rolls, provider data, or summary substitution.
-- [ ] 3.2 Add validated main/preload export orchestration with an immutable snapshot, native save dialog, sanitized `.md` suggestion, protected application-data destinations, busy guards, UTF-8 writing, and saved/cancelled results; verify injected dialog/file tests cover success, cancellation, write failure, no history, active operations, and unchanged adventure/settings bytes.
-- [ ] 3.3 Add Export History to the story header with disabled explanations, export busy state, success/error feedback, and safe navigation/replacement behavior while exporting; verify running-app checks cover ready and recoverable pending exports and no extra provider request or reroll; document export content and how to read Markdown as text in the user guide.
+- [x] 3.1 Add a pure Markdown transcript formatter for full saved history, character, premise, chapters, all choices with selection markers, checks, and a distinct pending-state section; verify long English/Portuguese fixtures preserve accents and all source scenes without duplicate pending selections/rolls, provider data, or summary substitution.
+- [x] 3.2 Add validated main/preload export orchestration with an immutable snapshot, native save dialog, sanitized `.md` suggestion, protected application-data destinations, busy guards, UTF-8 writing, and saved/cancelled results; verify injected dialog/file tests cover success, cancellation, write failure, no history, active operations, and unchanged adventure/settings bytes.
+- [x] 3.3 Add Export History to the story header with disabled explanations, export busy state, success/error feedback, and safe navigation/replacement behavior while exporting; verify running-app checks cover ready and recoverable pending exports and no extra provider request or reroll; document export content and how to read Markdown as text in the user guide.
 
 ## 4. Compact desktop layout
 

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CharacterSetup } from '../shared/character-rules';
 import type { StoryPreferences } from '../shared/types';
+import type { HistoryExportResult } from '../shared/types';
 import type {
   Adventure,
   ChoiceTurnResult,
@@ -14,6 +15,7 @@ import type {
 } from '../shared/types';
 
 contextBridge.exposeInMainWorld('mindtraveller', {
+  exportHistory: (): Promise<HistoryExportResult> => ipcRenderer.invoke('story:export-history'),
   getStoryPreferences: (): Promise<StoryPreferences> => ipcRenderer.invoke('preferences:get'),
   saveStoryPreferences: (preferences: StoryPreferences): Promise<StoryPreferences> => ipcRenderer.invoke('preferences:save', preferences),
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:get-info'),

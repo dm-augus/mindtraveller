@@ -2,7 +2,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const http = require('node:http');
 const path = require('node:path');
-const { app, safeStorage } = require('electron');
+const { app, safeStorage, dialog } = require('electron');
+let exportDialog;
+dialog.showSaveDialog = async (_window, options) => {
+  assert.equal(options.title, 'Export History');
+  assert.ok(exportDialog, 'Unexpected save dialog');
+  return exportDialog(options);
+};
 const { AdventureStore } = require('../dist/main/adventure-storage.js');
 const { ProviderSettingsStore } = require('../dist/main/provider-settings.js');
 
@@ -111,6 +117,34 @@ async function checkWindow(window, store) {
     await settle();
     await fs.writeFile(path.join(output, `${name}.png`), (await window.webContents.capturePage(undefined, { stayAwake: true })).toPNG());
   }
+  async function checkExport(name, pendingRoll = null) {
+    const bytes = await fs.readFile(store.activePath, 'utf8');
+    const calls = JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations });
+    const destination = path.join(output, `${name}.md`);
+    let release;
+    exportDialog = () => new Promise((resolve) => { release = resolve; });
+    await evaluate(() => {
+      const button = document.querySelector('[data-action="export-history"]');
+      button.click(); button.click();
+    });
+    await waitFor(() => document.querySelector('[data-action="export-history"]').textContent.includes('Exporting'));
+    assert.equal(await evaluate(() => document.querySelector('[data-view="new-story"]').disabled), true);
+    assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:not(:disabled)').length), 0);
+    await assert.rejects(evaluate(() => window.mindtraveller.requestNewStory()));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(release);
+    release({ canceled: false, filePath: destination });
+    await waitFor(() => Boolean(document.querySelector('.export-feedback')));
+    const text = await fs.readFile(destination, 'utf8');
+    assert.match(text, /# Mindtraveller/);
+    if (pendingRoll) {
+      assert.match(text, /Pending state/);
+      assert.ok(text.includes(`D100 ${pendingRoll.roll} · Threshold ${pendingRoll.threshold}`));
+    }
+    assert.equal(await fs.readFile(store.activePath, 'utf8'), bytes);
+    assert.equal(JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations }), calls);
+    exportDialog = undefined;
+  }
   async function layout() {
     const metrics = await evaluate(() => {
       const rect = (selector) => {
@@ -147,6 +181,7 @@ async function checkWindow(window, store) {
   // Windows may round a physical pixel when converting back to scaled DIP sizes.
   assert.ok(window.getSize().every((size, index) => Math.abs(size - [1200, 800][index]) <= 1));
   assert.match(await evaluate(() => document.querySelector('.story-scroll').textContent), /A new adventure awaits/);
+  assert.equal(await evaluate(() => document.querySelector('[data-action="export-history"]').disabled), true);
   await layout();
   await capture('shell-empty-1200');
   window.setSize(760, 520);
@@ -228,6 +263,16 @@ async function checkWindow(window, store) {
     { Strength: 3, Dexterity: 2, Intelligence: -2, Endurance: 0, Charisma: 0, Luck: 0 });
   assert.equal(generated.phase.kind, 'ready');
   await capture('setup-generated-760');
+  await checkExport('history-ready');
+  exportDialog = async () => ({ canceled: false, filePath: output });
+  await evaluate(() => document.querySelector('[data-action="export-history"]').click());
+  await waitFor(() => Boolean(document.querySelector('.error-banner')));
+  assert.equal(await evaluate(() => Boolean(document.querySelector('.export-feedback'))), false);
+  exportDialog = async () => ({ canceled: true });
+  await evaluate(() => document.querySelector('[data-action="export-history"]').click());
+  await waitFor(() => document.querySelector('[data-action="export-history"]').disabled === false);
+  assert.equal(await evaluate(() => Boolean(document.querySelector('.error-banner, .export-feedback'))), false);
+  exportDialog = undefined;
 
   await evaluate(() => document.querySelector('[data-choice-id="enter"]').click());
   assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 3);
@@ -236,6 +281,7 @@ async function checkWindow(window, store) {
   const pendingCheck = (await store.load()).phase.check;
   assert.equal((await store.load()).phase.kind, 'pending-narration');
   assert.equal(checkedAssessments, 1);
+  await checkExport('history-pending-check', pendingCheck);
   const checkText = await evaluate(() => document.querySelector('[aria-label="Saved check result"]').textContent);
   assert.match(checkText, /Hard/);
   assert.match(checkText, /Strength \+3/);

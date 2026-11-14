@@ -27,7 +27,7 @@ app.on('browser-window-created', (_event, window) => {
         result.nodeRequire !== 'undefined' ||
         result.rawIpc !== 'undefined' ||
         JSON.stringify(result.bridgeKeys) !== JSON.stringify([
-          'getAppInfo', 'getProviderSettings', 'getStoryPreferences', 'listProviderModels', 'quit', 'requestNewStory',
+          'exportHistory', 'getAppInfo', 'getProviderSettings', 'getStoryPreferences', 'listProviderModels', 'quit', 'requestNewStory',
           'resolveNewStory', 'restoreAdventure', 'retryOpening', 'retryTurn', 'saveProviderConfiguration',
           'saveStoryPreferences', 'setOpenAiKey', 'startOpening', 'submitChoice'
         ].sort()) ||

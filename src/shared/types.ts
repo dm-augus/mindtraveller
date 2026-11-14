@@ -1,6 +1,7 @@
 export type Theme = 'Horror' | 'Romance' | 'High Fantasy';
 export type StoryLanguage = 'en' | 'pt-BR';
 export interface StoryPreferences { defaultStoryLanguage: StoryLanguage }
+export type HistoryExportResult = { kind: 'cancelled' } | { kind: 'saved'; filePath: string };
 export type Nature = 'Good' | 'Neutral' | 'Bad';
 export type AllocationMethod = 'Balanced' | 'Simplified';
 

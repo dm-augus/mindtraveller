@@ -7,6 +7,7 @@ export class NewStoryController {
   private transitions: Promise<void> = Promise.resolve();
 
   constructor(private readonly store: AdventureStore) {}
+  get hasPendingConfirmation(): boolean { return this.pending !== null; }
 
   private runExclusive<T>(action: () => Promise<T>): Promise<T> {
     const result = this.transitions.then(action);
