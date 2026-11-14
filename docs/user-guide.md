@@ -1,5 +1,7 @@
 # Mindtraveller: story language
 
+The compact sidebar contains navigation and character information. Genre, chapter, story language, and Export History appear together above the narrative. The story and decision areas scroll separately; long choices wrap, and pending roll details and Retry remain reachable within the decision area.
+
 Choose **English** or **Português** in New Story before starting an adventure. Português requests Brazilian Portuguese. Your selection is saved as the default for future adventures. You can also change that default under **Language for new stories** in Settings.
 
 Each adventure keeps the language selected at creation. Changing the default does not translate or alter the current adventure. The story heading shows its language. Adventures saved by older versions without a language use English.

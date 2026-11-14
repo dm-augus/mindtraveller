@@ -114,8 +114,15 @@ async function checkWindow(window, store) {
       && [...document.images].every((image) => image.complete && image.naturalWidth > 0));
   }
   async function capture(name) {
-    await settle();
-    await fs.writeFile(path.join(output, `${name}.png`), (await window.webContents.capturePage(undefined, { stayAwake: true })).toPNG());
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await settle();
+      try {
+        await fs.writeFile(path.join(output, `${name}.png`), (await window.webContents.capturePage(undefined, { stayAwake: true })).toPNG());
+        return;
+      } catch (error) {
+        if (attempt === 2 || !String(error).includes('UnknownVizError')) throw error;
+      }
+    }
   }
   async function checkExport(name, pendingRoll = null) {
     const bytes = await fs.readFile(store.activePath, 'utf8');
@@ -263,6 +270,30 @@ async function checkWindow(window, store) {
     { Strength: 3, Dexterity: 2, Intelligence: -2, Endurance: 0, Charisma: 0, Luck: 0 });
   assert.equal(generated.phase.kind, 'ready');
   await capture('setup-generated-760');
+  const measurements = [];
+  for (const [width, height] of [[1200, 800], [760, 520]]) {
+    window.setSize(width, height);
+    await settle();
+    measurements.push(await evaluate(() => ({ width: innerWidth, height: innerHeight,
+      narrativeHeight: document.querySelector('.story-scroll').clientHeight,
+      fontSize: getComputedStyle(document.querySelector('.story-scroll')).fontSize,
+      decisionFontSize: getComputedStyle(document.querySelector('.choice-button')).fontSize })));
+    await capture(`layout-short-choices-${width}`);
+  }
+  const measuringBaseline = process.env.MINDTRAVELLER_CAPTURE_LAYOUT_BASELINE === '1';
+  await fs.writeFile(path.join(output, measuringBaseline ? 'layout-baseline.json' : 'layout-after.json'), JSON.stringify(measurements, null, 2));
+  if (!measuringBaseline) {
+    assert.equal(await evaluate(() => document.querySelector('.titlebar') === null), true);
+    assert.match(window.getTitle(), /Mindtraveller/);
+    assert.match(await evaluate(() => document.querySelector('.story-genre').textContent), /Horror/);
+    const baseline = JSON.parse(await fs.readFile(path.join(__dirname, '../docs/layout-baseline.json'), 'utf8'));
+    for (let index = 0; index < measurements.length; index += 1) {
+      assert.ok(measurements[index].narrativeHeight > baseline[index].narrativeHeight,
+        `Narrative viewport must increase: ${JSON.stringify({ before: baseline[index], after: measurements[index] })}`);
+      assert.equal(measurements[index].fontSize, baseline[index].fontSize);
+      assert.equal(measurements[index].decisionFontSize, baseline[index].decisionFontSize);
+    }
+  }
   await checkExport('history-ready');
   exportDialog = async () => ({ canceled: false, filePath: output });
   await evaluate(() => document.querySelector('[data-action="export-history"]').click());
@@ -555,6 +586,74 @@ async function checkWindow(window, store) {
   assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 4);
   await layout();
   await capture('shell-pending-760');
+  if (!measuringBaseline) {
+    const longChoices = pending.segments.at(-1).choices.map((choice, index) => ({ ...choice,
+      text: `${index + 1}. Investigar cuidadosamente as inscrições à entrada da abadia e conversar com os viajantes sobre a maldição, sem abandonar os companheiros que aguardam notícias na praça da aldeia.` }));
+    const longResults = [];
+    for (const state of ['ready', 'pending-narration']) {
+      const portuguese = structuredClone(pending);
+      portuguese.language = 'pt-BR';
+      portuguese.segments.at(-1).choices = longChoices;
+      portuguese.segments.at(-1).narrative = 'Através das ruínas, a viajante procura notícias dos companheiros.\n\n'.repeat(8);
+      portuguese.segments.at(-1).selectedChoiceId = state === 'ready' ? null : 'merchant';
+      portuguese.phase = state === 'ready' ? { kind: 'ready' }
+        : { ...pending.phase, choice: { ...pending.phase.choice, choiceText: longChoices[0].text } };
+      await store.save(portuguese);
+      const loaded = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
+      window.webContents.reload(); await loaded; await ready();
+      for (const [width, height] of [[1200, 800], [760, 520]]) {
+        window.setSize(width, height); await settle(); await layout();
+        const detail = await evaluate(() => {
+          const story = document.querySelector('.story-scroll'), decisions = document.querySelector('.choice-list');
+          const before = story.scrollTop;
+          const last = document.querySelector('[data-choice-id]:last-child');
+          last.scrollIntoView({ block: 'end', container: 'nearest' });
+          return { narrativeHeight: story.clientHeight, storyFontSize: getComputedStyle(story).fontSize,
+            decisionOverflow: decisions.scrollHeight > decisions.clientHeight,
+            horizontalOverflow: decisions.scrollWidth > decisions.clientWidth,
+            decisionsScroll: decisions.scrollTop, storyUnchanged: story.scrollTop === before,
+            wrapped: [...document.querySelectorAll('[data-choice-id] span')].every((label) => label.getBoundingClientRect().height > 30) };
+        });
+        assert.ok(detail.narrativeHeight >= 100);
+        assert.equal(detail.decisionOverflow, true);
+        assert.equal(detail.horizontalOverflow, false);
+        assert.ok(detail.decisionsScroll > 0);
+        assert.equal(detail.storyUnchanged, true, 'Decision scrolling must not move the narrative');
+        assert.equal(detail.wrapped, true);
+        assert.equal(detail.storyFontSize, width === 1200 ? '17px' : '16px');
+        await evaluate(() => document.querySelector('.story-scroll').focus());
+        window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+        window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
+        await settle();
+        const focus = await evaluate(() => {
+          const active = document.activeElement, style = getComputedStyle(active);
+          const pane = document.querySelector('.choice-list').getBoundingClientRect(), rect = active.getBoundingClientRect();
+          return { control: active.matches('.choice-button, .retry-button'), visible: active.matches(':focus-visible'),
+            outline: style.outlineStyle, width: style.outlineWidth, inView: rect.top >= pane.top - 1 && rect.bottom <= pane.bottom + 1 };
+        });
+        assert.equal(focus.control, true); assert.equal(focus.visible, true);
+        assert.equal(focus.outline, 'dotted'); assert.ok(parseFloat(focus.width) >= 1.5, 'Focus outline must remain visible under Windows display scaling');
+        assert.equal(focus.inView, true);
+        if (state === 'pending-narration') {
+          for (const selector of ['.pending-hint', '.pending-roll-summary', '.retry-button']) {
+            assert.equal(await evaluate((target) => {
+              const element = document.querySelector(target); element.scrollIntoView({ block: 'center', container: 'nearest' });
+              const bounds = element.getBoundingClientRect(), pane = document.querySelector('.choice-list').getBoundingClientRect();
+              return bounds.top >= pane.top - 1 && bounds.bottom <= pane.bottom + 1;
+            }, selector), true, `${selector} must be reachable`);
+          }
+        }
+        longResults.push({ state, width, height, ...detail, focus });
+        const headerPosition = await evaluate(() => ({ titleTop: document.querySelector('#view-title').getBoundingClientRect().top,
+          parents: ['.section-header', '.story-panel', '.adventure-body', '.workspace', '.app-shell'].map((selector) => {
+            const element = document.querySelector(selector); return { selector, top: element.getBoundingClientRect().top, scroll: element.scrollTop };
+          }) }));
+        assert.ok(headerPosition.titleTop >= 0, JSON.stringify(headerPosition));
+        await capture(`layout-portuguese-${state}-${width}`);
+      }
+    }
+    await fs.writeFile(path.join(output, 'layout-long-choices.json'), JSON.stringify(longResults, null, 2));
+  }
   const quitBytes = await fs.readFile(store.activePath, 'utf8');
   app.once('will-quit', (event) => {
     event.preventDefault();

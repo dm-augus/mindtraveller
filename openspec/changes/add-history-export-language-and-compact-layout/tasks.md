@@ -19,8 +19,8 @@
 
 ## 4. Compact desktop layout
 
-- [ ] 4.1 Capture current narrative viewport heights for the same short-choice fixture at 1200x800 and 760x520; remove the in-app title strip, relocate genre/chapter/language/export into a wrapping story header, and compact sidebar branding/navigation; verify larger narrative viewports at both sizes with native window controls, bundled assets, navigation, status, and version preserved.
-- [ ] 4.2 Tune story padding and independently scrollable decision height without shrinking body text; verify screenshots and layout assertions at both supported sizes cover long Portuguese choices, no horizontal overflow, narrative height of at least 100 CSS pixels, reachable pending hints/roll/retry, and visible keyboard focus indicators.
+- [x] 4.1 Capture current narrative viewport heights for the same short-choice fixture at 1200x800 and 760x520; remove the in-app title strip, relocate genre/chapter/language/export into a wrapping story header, and compact sidebar branding/navigation; verify larger narrative viewports at both sizes with native window controls, bundled assets, navigation, status, and version preserved.
+- [x] 4.2 Tune story padding and independently scrollable decision height without shrinking body text; verify screenshots and layout assertions at both supported sizes cover long Portuguese choices, no horizontal overflow, narrative height of at least 100 CSS pixels, reachable pending hints/roll/retry, and visible keyboard focus indicators.
 
 ## 5. Integrated and installed release verification
 

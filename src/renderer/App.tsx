@@ -119,7 +119,9 @@ export function App(): React.JSX.Element {
       : adventure.phase.kind === 'pending-narration'
         ? panel?.querySelector('.pending-story .check-result')
         : panel?.querySelector('.pending-story');
-    target?.scrollIntoView({ block: 'start' });
+    if (panel && target) {
+      panel.scrollTo({ top: panel.scrollTop + target.getBoundingClientRect().top - panel.getBoundingClientRect().top });
+    }
   }, [adventure?.segments.length, adventure?.phase.kind, view]);
   useEffect(() => {
     let active = true;
@@ -224,9 +226,9 @@ export function App(): React.JSX.Element {
   const model = settings?.[settings.activeProvider].modelId;
   return (
     <main className="app-shell" data-current-view={view} data-loading={loading} aria-busy={busy}>
-      <header className="titlebar"><h1>Mindtraveller</h1><span className="titlebar-context">{adventure?.theme ?? 'A world of your own'}</span></header>
       <div className="workspace">
         <aside className="sidebar">
+          <h1 className="sidebar-brand">Mindtraveller</h1>
           <div className="branding-frame"><img className="dice-artwork" src={diceArtwork} alt="A twenty-sided die surrounded by violet flames" /></div>
           <nav className="main-navigation" aria-label="Main navigation">{NAVIGATION.map((item) => (
             <button key={item.view} className={`retro-button nav-button${view === item.view ? ' is-selected' : ''}`}
@@ -247,7 +249,8 @@ export function App(): React.JSX.Element {
               {view !== 'story' && <button className="return-story" data-action="return-story" onClick={() => setView('story')}>Return to story</button>}
               {view === 'story' && <div className="story-tools">
               {adventure && <span className="chapter-label" aria-label="Adventure language">
-                {current && `Chapter ${current.chapterNumber} · `}{LANGUAGE_LABELS[adventure.language]}</span>}
+                <span className="story-genre">{adventure.theme}</span>
+                {current && <span>Chapter {current.chapterNumber}</span>}<span>{LANGUAGE_LABELS[adventure.language]}</span></span>}
               <button className="return-story export-history" type="button" data-action="export-history"
                 disabled={busy || Boolean(confirmation) || !adventure?.segments.length} title={exportReason}
                 onClick={() => { void exportHistory(); }}>{exporting ? 'Exporting…' : 'Export History'}</button>
