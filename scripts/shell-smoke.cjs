@@ -254,6 +254,9 @@ async function checkWindow(window, store) {
   assert.equal(checked.phase.kind, 'ready');
   assert.deepEqual(checked.segments.at(-1).check, pendingCheck);
   assert.equal(checked.segments[0].selectedChoiceId, 'enter');
+  assert.deepEqual(await evaluate(() => [...document.querySelectorAll('[data-choice-id] span')].map((label) => label.textContent)),
+    checked.segments.at(-1).choices.map((choice) => choice.text));
+  assert.notDeepEqual(checked.segments.at(-1).choices, generated.segments.at(-1).choices);
   assert.equal(checkedAssessments, 1);
   assert.deepEqual(narratedChecks, [pendingCheck, pendingCheck]);
   assert.equal(await evaluate(() => document.querySelectorAll('[aria-label="Check result"]').length), 1);
@@ -280,6 +283,9 @@ async function checkWindow(window, store) {
   assert.equal(simple.phase.kind, 'ready');
   assert.equal(simple.segments.at(-1).check, null);
   assert.equal(simple.segments[1].selectedChoiceId, 'ask');
+  assert.deepEqual(await evaluate(() => [...document.querySelectorAll('[data-choice-id] span')].map((label) => label.textContent)),
+    simple.segments.at(-1).choices.map((choice) => choice.text));
+  assert.notDeepEqual(simple.segments.at(-1).choices, checked.segments.at(-1).choices);
   assert.equal(simpleAssessments, 2);
   assert.equal(await evaluate(() => document.querySelectorAll('[aria-label="Check result"]').length), 1);
   await capture('story-no-check-complete-760');
@@ -530,12 +536,14 @@ void (async () => {
     } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'ask') {
       simpleAssessments += 1;
       if (simpleAssessments === 1) { response.writeHead(503).end(); return; }
-      content = { kind: 'no-check', narrative: 'The villagers share a warning.', choices };
+      content = { kind: 'no-check', narrative: 'The villagers share a warning.',
+        choices: choices.map((choice) => ({ ...choice, text: `${choice.text} Follow the villagers' warning.` })) };
     } else if (prompt.operation === 'checked-narration') {
       narratedChecks.push(prompt.check);
       if (narratedChecks.length === 1) { response.writeHead(503).end(); return; }
       content = { outcome: prompt.check.outcome,
-        narrative: prompt.check.outcome === 'success' ? 'Aveline opens the crypt door.' : 'The crypt door resists Aveline.', choices };
+        narrative: prompt.check.outcome === 'success' ? 'Aveline opens the crypt door.' : 'The crypt door resists Aveline.',
+        choices: choices.map((choice) => ({ ...choice, text: `${choice.text} After the crypt door attempt.` })) };
     } else {
       throw new Error(`Unexpected smoke provider operation: ${prompt.operation}`);
     }
