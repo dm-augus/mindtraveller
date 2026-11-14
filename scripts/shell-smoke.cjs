@@ -16,8 +16,43 @@ let failOpeningOnce = false;
 let checkedAssessments = 0;
 let simpleAssessments = 0;
 const narratedChecks = [];
+const openAiOperations = [];
+let failGlobalSummaryOnce = true;
+// Stub only the OpenAI transport; keep the actual adapter, IPC, controller, and storage.
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url, options) => {
+  if (new URL(url).origin !== 'https://api.openai.com') return originalFetch(url, options);
+  assert.equal(options.headers.authorization, 'Bearer sk-integration-fixture');
+  if (new URL(url).pathname === '/v1/models') {
+    return Response.json({ data: [{ id: 'integration-model' }] });
+  }
+  assert.equal(new URL(url).pathname, '/v1/responses');
+  const body = JSON.parse(options.body);
+  assert.equal(body.model, 'integration-model');
+  const prompt = JSON.parse(body.input[1].content);
+  openAiOperations.push(prompt.operation === 'summary' ? prompt.kind : prompt.operation);
+  let content;
+  if (prompt.operation === 'assessment') {
+    assert.equal(prompt.choice.choiceId, 'wait');
+    content = { kind: 'no-check', narrative: 'Aveline waits while the village bell rings.', choices: [
+      { id: 'wait', text: 'Wait for the bell.' },
+      { id: 'ask', text: 'Ask about the bell.' },
+      { id: 'enter', text: 'Enter the crypt.' }
+    ] };
+  } else {
+    assert.equal(prompt.operation, 'summary');
+    if (prompt.kind === 'global' && failGlobalSummaryOnce) {
+      failGlobalSummaryOnce = false;
+      return new Response('', { status: 503 });
+    }
+    content = { text: 'Aveline investigated the crypt and heard the village warning.',
+      keyFacts: ['The village bell rings.'], unresolvedThreads: ['Discover the source of the bell.'] };
+  }
+  return Response.json({ status: 'completed', output: [{ type: 'message', role: 'assistant',
+    content: [{ type: 'output_text', text: JSON.stringify(content) }] }] });
+};
 let finishing = false;
-const timeout = setTimeout(() => { void finish(1, new Error('Shell smoke check timed out.')); }, 30_000);
+const timeout = setTimeout(() => { void finish(1, new Error('Shell smoke check timed out.')); }, 60_000);
 
 async function finish(code, error) {
   if (finishing) return;
@@ -60,9 +95,9 @@ async function checkWindow(window, store) {
     catch (error) { throw new Error(`Renderer check failed: ${fn.toString()}`, { cause: error }); }
   };
   const settle = () => new Promise((resolve) => setTimeout(resolve, 80));
-  async function waitFor(fn) {
+  async function waitFor(fn, ...args) {
     for (let attempt = 0; attempt < 80; attempt += 1) {
-      if (await evaluate(fn)) return;
+      if (await evaluate(fn, ...args)) return;
       await settle();
     }
     throw new Error(`Renderer condition did not become true: ${fn.toString()}`);
@@ -249,6 +284,63 @@ async function checkWindow(window, store) {
   assert.equal(await evaluate(() => document.querySelectorAll('[aria-label="Check result"]').length), 1);
   await capture('story-no-check-complete-760');
 
+  await evaluate(() => document.querySelector('[data-view="settings"]').click());
+  await waitFor(() => Boolean(document.querySelector('.settings-content')));
+  await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
+  await evaluate(() => {
+    const field = document.querySelector('input[type="password"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'sk-integration-fixture');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.settings-check input').click();
+  });
+  await evaluate(() => document.querySelector('.settings-content button[type="button"]').click());
+  await waitFor(() => document.querySelector('.settings-content button[type="button"]').disabled === false);
+  // Discovery refreshes the persisted provider configuration; select OpenAI before saving.
+  await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
+  await evaluate(() => {
+    const field = document.querySelector('.settings-content select');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(field, 'integration-model');
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await evaluate(() => document.querySelector('.settings-content button[type="submit"]').click());
+  await waitFor(() => document.querySelector('.settings-feedback')?.textContent.includes('settings saved'));
+  await evaluate(() => document.querySelector('[data-action="return-story"]').click());
+  for (let count = 4; count <= 10; count += 1) {
+    await waitFor(() => Boolean(document.querySelector('[data-choice-id="wait"]:not(:disabled)')));
+    await evaluate(() => {
+      const button = document.querySelector('[data-choice-id="wait"]');
+      button.click();
+      button.click();
+    });
+    await waitFor((expected) => document.querySelectorAll('[data-segment-id]').length === expected, count);
+  }
+  await waitFor(() => Boolean(document.querySelector('[role="alert"]') && document.querySelector('.retry-button:not(:disabled)')));
+  const pendingSummary = await store.load();
+  assert.equal(pendingSummary.phase.kind, 'pending-summary');
+  assert.equal(pendingSummary.chapterSummaries.length, 0);
+  const summaryReload = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload();
+  await summaryReload;
+  await ready();
+  await evaluate(() => document.querySelector('.retry-button').click());
+  await waitFor(() => document.querySelectorAll('[data-choice-id]:disabled').length === 0);
+  const summarized = await store.load();
+  assert.equal(summarized.phase.kind, 'ready');
+  assert.equal(summarized.segments.length, 10);
+  assert.equal(new Set(summarized.segments.map((segment) => segment.id)).size, 10);
+  assert.equal(summarized.segments.filter((segment) => segment.selectedChoiceId !== null).length, 9);
+  assert.deepEqual(summarized.segments.filter((segment) => segment.check).map((segment) => segment.check), [pendingCheck]);
+  assert.equal(summarized.chapterSummaries.length, 1);
+  assert.match(summarized.globalSummary, /source of the bell/);
+  assert.deepEqual(openAiOperations, [...Array(7).fill('assessment'), 'chapter', 'global', 'chapter', 'global']);
+  assert.equal((await fs.readFile(store.activePath, 'utf8')).includes('sk-integration-fixture'), false);
+  await capture('story-summary-restored-760');
+  // Restore Ollama for the remaining navigation and error checks.
+  const settingsStore = new ProviderSettingsStore(userData, safeStorage);
+  const settings = await settingsStore.getPublicSettings();
+  await settingsStore.saveConfiguration({ activeProvider: 'ollama', ollama: settings.ollama,
+    openai: { modelId: settings.openai.modelId } });
+
   const saved = adventure();
   await store.save(saved);
   const bytes = await fs.readFile(store.activePath, 'utf8');
@@ -327,7 +419,8 @@ async function checkWindow(window, store) {
       });
       await evaluate(() => document.querySelector('input[name="provider"][value="ollama"]').click());
       await evaluate(() => document.querySelector('.settings-content button[type="submit"]').click());
-      await waitFor(() => document.querySelector('.settings-feedback')?.textContent.includes('session only'));
+      await waitFor(() => document.querySelector('.settings-feedback')?.textContent.includes('session only')
+        && document.querySelector('.settings-content button[type="submit"]').disabled === false);
       assert.equal(await evaluate(() => document.querySelector('.settings-content').textContent.includes('sk-smoke-secret')), false);
       await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
       assert.equal(await evaluate(() => document.querySelector('input[type="password"]').value), '');
@@ -393,7 +486,7 @@ async function checkWindow(window, store) {
     void (async () => {
       assert.equal(window.isDestroyed(), true);
       assert.equal(await fs.readFile(store.activePath, 'utf8'), quitBytes);
-      console.log('Shell verified at 1200x800 and 760x520: images, scrolling, navigation, pending status, and Quit.');
+      console.log('Integrated app verified: creation, Ollama and OpenAI stubs, checked/no-check retry, summary failure and restoration, replacement, stable decisions and rolls, navigation, assets, and Quit.');
       console.log(`Screenshots: ${output}`);
       await finish(0);
     })().catch((error) => finish(1, error));

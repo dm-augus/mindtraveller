@@ -3,6 +3,7 @@
   "productName": "Mindtraveller",
   "version": "0.1.0",
   "description": "A text-based fantasy RPG desktop application",
+  "author": "Mindtraveller contributors",
   "private": true,
   "main": "dist/main/index.js",
   "scripts": {

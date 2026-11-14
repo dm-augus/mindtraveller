@@ -49,5 +49,5 @@
 
 ## 8. Integrated Windows release check
 
-- [ ] 8.1 Run typecheck and automated tests, then exercise character creation, both provider adapters with stubs, a checked turn, retry, summary, save/restore, and replacement in the running app; verify all paths complete without duplicate decisions or rolls.
-- [ ] 8.2 Create a Windows installer with Electron Forge and smoke-test the installed app's launch, bundled UI assets, local save location, restoration, and Quit behavior; verify the package is usable without a separately hosted server.
+- [x] 8.1 Run typecheck and automated tests, then exercise character creation, both provider adapters with stubs, a checked turn, retry, summary, save/restore, and replacement in the running app; verify all paths complete without duplicate decisions or rolls.
+- [x] 8.2 Create a Windows installer with Electron Forge and smoke-test the installed app's launch, bundled UI assets, local save location, restoration, and Quit behavior; verify the package is usable without a separately hosted server.

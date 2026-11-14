@@ -2,7 +2,9 @@ module.exports = {
   packagerConfig: {
     name: 'Mindtraveller',
     executableName: 'Mindtraveller',
-    asar: true
+    asar: true,
+    ignore: (filePath) => filePath !== '' && !/^\/(dist|node_modules)(\/|$)/.test(filePath)
+      && filePath !== '/package.json'
   },
   makers: [
     {
