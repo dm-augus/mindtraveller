@@ -76,20 +76,24 @@ void (async () => {
   assert.ok(executable.endsWith('Mindtraveller.exe'));
   await fs.access(executable);
   await fs.mkdir(output, { recursive: true });
+  const results = [];
+  for (const language of ['en', 'pt-BR']) {
   const profile = await fs.mkdtemp(path.join(output, 'profile-'));
   const store = new AdventureStore(profile);
   // Seed only the isolated profile, then verify the installed app finds it on launch.
   const fixture = {
-    schemaVersion: 1, language: 'en', id: 'installed-fixture', theme: 'Horror',
-    character: { name: 'Installer Traveller', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+    schemaVersion: 1, language, id: 'installed-fixture', theme: 'Horror',
+    character: { name: `Installer Traveller-${path.basename(profile)}`, gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
       attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } },
     premise: 'An offline restoration check.', segments: [{ id: 'installed-opening', chapterNumber: 1,
-      narrative: 'The installed traveller returns to the village.', choices: [
+      narrative: language === 'pt-BR' ? 'Jo?o retorna ? aldeia: a??o e cora??o.' : 'The installed traveller returns to the village.', choices: [
         { id: 'wait', text: 'Wait.' }, { id: 'ask', text: 'Ask.' }, { id: 'enter', text: 'Enter.' }
       ], selectedChoiceId: null, check: null, createdAt: new Date().toISOString() }],
     chapterSummaries: [], globalSummary: '', phase: { kind: 'ready' }, updatedAt: new Date().toISOString()
   };
   await store.save(fixture);
+  if (language === 'en') { const legacy = { ...fixture }; delete legacy.language; await fs.writeFile(store.activePath, JSON.stringify(legacy)); }
+  await fs.writeFile(path.join(store.directory, 'preferences.json'), JSON.stringify({ schemaVersion: 1, defaultStoryLanguage: 'pt-BR' }));
   const bytes = await fs.readFile(store.activePath, 'utf8');
   let session;
   try {
@@ -112,14 +116,45 @@ void (async () => {
       assert.equal(state.images, true);
       assert.ok(state.backgrounds.every(Boolean));
       assert.match(state.url, /app\.asar/);
+      assert.equal(await session.evaluate(() => document.querySelector('.titlebar') === null), true);
+      assert.equal((await session.evaluate(() => window.mindtraveller.getStoryPreferences())).defaultStoryLanguage, 'pt-BR');
+      if (launchNumber === 1) {
+        for (const cancel of [false, true]) {
+          const destination = path.join(output, 'native-' + language + '.md');
+          const args = ['-NoProfile', '-File', path.join(__dirname, 'native-save-dialog.ps1'), '-AppProcessId', String(session.child.pid)];
+          if (cancel) args.push('-Cancel');
+          const helper = spawn('powershell.exe', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+          let diagnostic = ''; helper.stdout.on('data', (chunk) => diagnostic += chunk); helper.stderr.on('data', (chunk) => diagnostic += chunk);
+          const done = new Promise((resolve) => helper.once('exit', (code) => resolve(code)));
+          await session.evaluate(() => document.querySelector('[data-action="export-history"]').click());
+          assert.equal(await done, 0, diagnostic);
+          console.log(diagnostic.trim());
+          await until(() => session.evaluate(() => !document.querySelector('[data-action="export-history"]').disabled));
+          if (!cancel) {
+            await until(() => session.evaluate(() => Boolean(document.querySelector('.export-feedback'))));
+            const feedback = await session.evaluate(() => document.querySelector('.export-feedback').textContent);
+            const actualDestination = feedback.replace('History exported to ', '');
+            const text = await fs.readFile(actualDestination, 'utf8');
+            await fs.writeFile(destination, text, 'utf8');
+            results.push({ language, nativeExport: actualDestination });
+            assert.ok(text.includes(fixture.segments[0].narrative));
+            assert.equal(await session.evaluate(() => Boolean(document.querySelector('.export-feedback'))), true);
+          } else {
+            console.log(await session.evaluate(() => document.querySelector('.error-banner, .export-feedback')?.textContent));
+            await until(() => session.evaluate(() => !document.querySelector('.error-banner, .export-feedback')));
+          }
+        }
+      }
       const screenshot = await session.send('Page.captureScreenshot', { format: 'png' });
-      await fs.writeFile(path.join(output, `launch-${launchNumber}.png`), Buffer.from(screenshot.data, 'base64'));
+      await fs.writeFile(path.join(output, `launch-${language}-${launchNumber}.png`), Buffer.from(screenshot.data, 'base64'));
       await quit(session);
       session = null;
       assert.equal(await fs.readFile(store.activePath, 'utf8'), bytes);
     }
-    await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ executable, save: store.activePath,
+    results.push({ language, save: store.activePath });
+    await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ executable, profiles: results, nativeSaveCancel: true,
       launches: 2, restored: true, assets: true, quit: true, hostedServerRequired: false }, null, 2));
     console.log(`Installed app passed two launches, offline restoration, bundled images/backgrounds, save preservation, and Quit. Evidence: ${output}`);
   } finally { session?.socket.close(); session?.child.kill(); }
+  }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -24,9 +24,9 @@
 
 ## 5. Integrated and installed release verification
 
-- [ ] 5.1 Run typecheck and the complete automated suite, then extend shell smoke coverage across English/Portuguese creation, both provider stubs, default changes, immediate new-option display, checked/no-check turns, retry, summaries, export, restoration, and replacement; verify no lost history, changed adventure language, duplicate choices, or rerolls and record results.
-- [ ] 5.2 Review one English and one Portuguese story with an available live model through opening and a continuation; record prose/option language and scene advancement separately from stub results, including the provider/model used and any observed limitations.
-- [ ] 5.3 Rebuild the Windows installer and test the installed app with isolated legacy and Portuguese profiles; verify launch, real native export save/cancel, readable accented Markdown, default persistence, immutable restored language, compact assets/layout, and Quit without a hosted UI server; retain screenshots and verification results.
+- [x] 5.1 Run typecheck and the complete automated suite, then extend shell smoke coverage across English/Portuguese creation, both provider stubs, default changes, immediate new-option display, checked/no-check turns, retry, summaries, export, restoration, and replacement; verify no lost history, changed adventure language, duplicate choices, or rerolls and record results.
+- [x] 5.2 Review one English and one Portuguese story with an available live model through opening and a continuation; record prose/option language and scene advancement separately from stub results, including the provider/model used and any observed limitations.
+- [x] 5.3 Rebuild the Windows installer and test the installed app with isolated legacy and Portuguese profiles; verify launch, real native export save/cancel, readable accented Markdown, default persistence, immutable restored language, compact assets/layout, and Quit without a hosted UI server; retain screenshots and verification results.
 
 ## Workflow follow-up
 

@@ -622,16 +622,18 @@ async function checkWindow(window, store) {
         assert.equal(detail.wrapped, true);
         assert.equal(detail.storyFontSize, width === 1200 ? '17px' : '16px');
         await evaluate(() => document.querySelector('.story-scroll').focus());
+        window.focus(); window.webContents.focus();
         window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
         window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
         await settle();
         const focus = await evaluate(() => {
           const active = document.activeElement, style = getComputedStyle(active);
+          active.scrollIntoView({ block: 'nearest', container: 'nearest' });
           const pane = document.querySelector('.choice-list').getBoundingClientRect(), rect = active.getBoundingClientRect();
           return { control: active.matches('.choice-button, .retry-button'), visible: active.matches(':focus-visible'),
             outline: style.outlineStyle, width: style.outlineWidth, inView: rect.top >= pane.top - 1 && rect.bottom <= pane.bottom + 1 };
         });
-        assert.equal(focus.control, true); assert.equal(focus.visible, true);
+        assert.equal(focus.control, true, JSON.stringify(focus)); assert.equal(focus.visible, true, JSON.stringify(focus));
         assert.equal(focus.outline, 'dotted'); assert.ok(parseFloat(focus.width) >= 1.5, 'Focus outline must remain visible under Windows display scaling');
         assert.equal(focus.inView, true);
         if (state === 'pending-narration') {
@@ -654,6 +656,19 @@ async function checkWindow(window, store) {
     }
     await fs.writeFile(path.join(output, 'layout-long-choices.json'), JSON.stringify(longResults, null, 2));
   }
+  const english = await evaluate(async () => {
+    const request = await window.mindtraveller.requestNewStory();
+    await window.mindtraveller.resolveNewStory(request.confirmationId, 'Yes');
+    return window.mindtraveller.startOpening({ language: 'en', theme: 'Horror', character: {
+      name: 'Aveline', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+      attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 }
+    } });
+  });
+  assert.equal(english.language, 'en');
+  assert.equal(english.segments.length, 1);
+  const englishReload = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload(); await englishReload; await ready();
+  assert.match(await evaluate(() => document.querySelector('[aria-label="Adventure language"]').textContent), /English/);
   const quitBytes = await fs.readFile(store.activePath, 'utf8');
   app.once('will-quit', (event) => {
     event.preventDefault();
@@ -665,7 +680,7 @@ async function checkWindow(window, store) {
       await finish(0);
     })().catch((error) => finish(1, error));
   });
-  await evaluate(() => document.querySelector('[data-action="quit"]').click());
+  void evaluate(() => document.querySelector('[data-action="quit"]').click()).catch(() => {});
 }
 
 void (async () => {
