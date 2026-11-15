@@ -1,4 +1,5 @@
 import { parseModelSelection, type StoryProvider } from '../../shared/provider-contract';
+import { AppTypeError } from '../../shared/app-error';
 import type { ProviderSettingsStore } from '../provider-settings';
 import { OllamaAdapter } from './ollama';
 import { OpenAiAdapter } from './openai';
@@ -16,7 +17,7 @@ export async function selectStoryProvider(
   const configuration = await settings.getPublicSettings();
   const provider = configuration.activeProvider;
   const modelId = configuration[provider].modelId;
-  if (modelId === null) throw new TypeError(`Select an ${provider === 'ollama' ? 'Ollama' : 'OpenAI'} model in Settings.`);
+  if (modelId === null) throw new AppTypeError('error.modelSettings', { provider: provider === 'ollama' ? 'Ollama' : 'OpenAI' });
   const selection = parseModelSelection({ provider, modelId });
   return {
     modelId: selection.modelId,

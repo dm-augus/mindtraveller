@@ -1,3 +1,4 @@
+import { AppError, AppTypeError } from '../shared/app-error';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ProviderConfiguration, ProviderSettings } from '../shared/types';
@@ -26,19 +27,19 @@ function isMissingFile(error: unknown): boolean {
 
 function modelId(value: unknown): string | null {
   if (value === null) return null;
-  if (typeof value !== 'string' || !value.trim()) throw new TypeError('Select a valid model.');
+  if (typeof value !== 'string' || !value.trim()) throw new AppTypeError('error.model');
   return value.trim();
 }
 
 function parseConfiguration(value: unknown): ProviderConfiguration {
   if (!isRecord(value) || !isRecord(value.ollama) || !isRecord(value.openai)) {
-    throw new TypeError('Invalid provider settings.');
+    throw new AppTypeError('error.providerSettings');
   }
   if (value.activeProvider !== 'ollama' && value.activeProvider !== 'openai') {
-    throw new TypeError('Select Ollama or OpenAI.');
+    throw new AppTypeError('error.provider');
   }
   if (typeof value.ollama.serverAddress !== 'string' || !value.ollama.serverAddress.trim()) {
-    throw new TypeError('Enter an Ollama server address.');
+    throw new AppTypeError('error.address');
   }
   return {
     activeProvider: value.activeProvider,
@@ -91,14 +92,14 @@ export class ProviderSettingsStore {
       text = await this.files.readFile(this.settingsPath, 'utf8');
     } catch (error) {
       if (isMissingFile(error)) return DEFAULT_CONFIGURATION;
-      throw new Error('Unable to read provider settings.');
+      throw new AppError('error.settingsRead');
     }
     try {
       const document: unknown = JSON.parse(text);
       if (!isRecord(document) || document.schemaVersion !== 1) throw new Error();
       return parseConfiguration(document);
     } catch {
-      throw new Error('Provider settings are invalid or unsupported.');
+      throw new AppError('error.settingsCorrupt');
     }
   }
 
@@ -108,7 +109,7 @@ export class ProviderSettingsStore {
       return true;
     } catch (error) {
       if (isMissingFile(error)) return false;
-      throw new Error('Unable to read saved key status.');
+      throw new AppError('error.keyStatus');
     }
   }
 
@@ -138,7 +139,7 @@ export class ProviderSettingsStore {
 
   async setOpenAiKey(key: unknown, persist: unknown): Promise<{ persisted: boolean }> {
     if (typeof key !== 'string' || !key.trim() || typeof persist !== 'boolean') {
-      throw new TypeError('Enter a valid OpenAI key and storage choice.');
+      throw new AppTypeError('error.keyInvalid');
     }
     const sessionKey = key.trim();
     this.sessionKey = sessionKey;
@@ -152,7 +153,7 @@ export class ProviderSettingsStore {
         await this.files.writeFile(this.temporaryKeyPath, encrypted);
         await this.files.rename(this.temporaryKeyPath, this.encryptedKeyPath);
       } catch {
-        throw new Error('Unable to save the OpenAI key securely.');
+        throw new AppError('error.keySave');
       }
     });
     return { persisted: true };
@@ -168,14 +169,14 @@ export class ProviderSettingsStore {
       encrypted = await this.files.readFile(this.encryptedKeyPath);
     } catch (error) {
       if (isMissingFile(error)) return null;
-      throw new Error('Unable to read the saved OpenAI key.');
+      throw new AppError('error.keyRead');
     }
     try {
       let decrypted = await this.protector.decryptStringAsync(encrypted);
       if (decrypted.shouldReEncrypt) decrypted = await this.protector.decryptStringAsync(encrypted);
       return decrypted.result;
     } catch {
-      throw new Error('Unable to unlock the saved OpenAI key.');
+      throw new AppError('error.keyUnlock');
     }
   }
 }

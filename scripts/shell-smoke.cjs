@@ -5,7 +5,7 @@ const path = require('node:path');
 const { app, safeStorage, dialog } = require('electron');
 let exportDialog;
 dialog.showSaveDialog = async (_window, options) => {
-  assert.equal(options.title, 'Export History');
+  assert.ok(['Export History', 'Exportar histórico'].includes(options.title));
   assert.ok(exportDialog, 'Unexpected save dialog');
   return exportDialog(options);
 };
@@ -686,6 +686,81 @@ async function checkWindow(window, store) {
   const englishReload = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
   window.webContents.reload(); await englishReload; await ready();
   assert.match(await evaluate(() => document.querySelector('[aria-label="Adventure language"]').textContent), /English/);
+
+  // Interface language remains independent of story language and persisted source data.
+  const interfaceSourceBytes = await fs.readFile(store.activePath, 'utf8');
+  const interfaceDefaultStoryLanguage = (await evaluate(() => window.mindtraveller.getStoryPreferences())).defaultStoryLanguage;
+  const interfaceCalls = JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations });
+  await evaluate(() => document.querySelector('[data-view="settings"]').click());
+  await waitFor(() => Boolean(document.querySelector('input[name="interface-language"][value="en"]:checked')));
+  await fs.mkdir(`${preferencesPath}.tmp`);
+  await evaluate(() => document.querySelector('input[name="interface-language"][value="pt-BR"]').click());
+  await waitFor(() => Boolean(document.querySelector('.interface-language-selector [role="alert"]')));
+  assert.equal(await evaluate(() => document.documentElement.lang), 'en');
+  assert.equal(await evaluate(() => document.querySelector('input[name="interface-language"][value="en"]').checked), true);
+  await fs.rmdir(`${preferencesPath}.tmp`);
+  await evaluate(() => document.querySelector('input[name="interface-language"][value="pt-BR"]').click());
+  await waitFor(() => document.documentElement.lang === 'pt-BR');
+  assert.match(await evaluate(() => document.querySelector('#view-title').textContent), /Configurações do narrador/);
+  assert.equal(await evaluate(language => document.querySelector(`input[name="story-language"][value="${language}"]`).checked, interfaceDefaultStoryLanguage), true);
+  await capture('settings-interface-pt-BR-760');
+  // A main-process validation error must be Portuguese and relabel on switching.
+  await evaluate(() => {
+    const field = document.querySelector('.settings-field input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'file:///invalid');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await evaluate(() => document.querySelector('.settings-content button[type="button"]').click());
+  await waitFor(() => document.querySelector('.settings-error')?.textContent.includes('deve usar HTTP ou HTTPS'));
+  await evaluate(() => document.querySelector('input[name="interface-language"][value="en"]').click());
+  await waitFor(() => document.querySelector('.settings-error')?.textContent.includes('must use HTTP or HTTPS'));
+  await evaluate(() => document.querySelector('input[name="interface-language"][value="pt-BR"]').click());
+  await waitFor(() => document.documentElement.lang === 'pt-BR');
+  await evaluate(() => document.querySelector('[data-view="rules"]').click());
+  await waitFor(() => document.querySelector('#view-title').textContent === 'Regras da jornada');
+  assert.match(await evaluate(() => document.querySelector('.rules-content').textContent), /Força/);
+  assert.match(await evaluate(() => document.querySelector('.rules-content').textContent), /Muito difícil/);
+  await capture('rules-interface-pt-BR-760');
+  await evaluate(() => document.querySelector('[data-action="return-story"]').click());
+  exportDialog = async options => {
+    assert.equal(options.title, 'Exportar histórico');
+    assert.equal(options.filters[0].name, 'Histórico em Markdown');
+    return { canceled: true };
+  };
+  await evaluate(() => document.querySelector('[data-action="export-history"]').click());
+  await waitFor(() => document.querySelector('[data-action="export-history"]').disabled === false);
+  exportDialog = undefined;
+  await evaluate(() => document.querySelector('[data-view="new-story"]').click());
+  await waitFor(() => Boolean(document.querySelector('[role="alertdialog"]')));
+  assert.equal(await evaluate(() => document.querySelector('#confirmation-title').textContent), 'Começar uma nova história?');
+  await evaluate(() => document.querySelector('.confirmation-actions button:first-child').click());
+  await waitFor(() => !document.querySelector('[role="alertdialog"]'));
+  assert.equal(await fs.readFile(store.activePath, 'utf8'), interfaceSourceBytes);
+  assert.equal(JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations }), interfaceCalls);
+  const { formatHistory } = require('../dist/main/history-formatter.js');
+  for (const interfaceLanguage of ['pt-BR', 'en']) {
+    for (const storyLanguage of ['en', 'pt-BR']) {
+      const matrixStory = { ...english, language: storyLanguage };
+      if (storyLanguage === 'pt-BR') matrixStory.segments = english.segments.map(segment => ({ ...segment,
+        narrative: 'Aveline entra na aldeia. Os moradores aguardam.', choices: segment.choices.map(choice => ({ ...choice, text: `Escolha ${choice.id}.` })) }));
+      await store.save(matrixStory);
+      await evaluate(locale => window.mindtraveller.saveStoryPreferences({ interfaceLanguage: locale }), interfaceLanguage);
+      const reload = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
+      window.webContents.reload(); await reload; await ready();
+      assert.equal(await evaluate(() => document.documentElement.lang), interfaceLanguage);
+      const before = await fs.readFile(store.activePath, 'utf8');
+      assert.equal(await evaluate(() => document.querySelector('.story-segment > p').textContent), matrixStory.segments[0].narrative);
+      assert.equal((await evaluate(() => window.mindtraveller.getStoryPreferences())).defaultStoryLanguage, interfaceDefaultStoryLanguage);
+      assert.equal((await store.load()).language, storyLanguage);
+      exportDialog = async () => ({ canceled: false, filePath: path.join(output, `interface-${interfaceLanguage}-story-${storyLanguage}.md`) });
+      await evaluate(() => document.querySelector('[data-action="export-history"]').click());
+      await waitFor(() => Boolean(document.querySelector('.export-feedback')));
+      assert.equal(await fs.readFile(path.join(output, `interface-${interfaceLanguage}-story-${storyLanguage}.md`), 'utf8'), formatHistory(matrixStory));
+      assert.equal(await fs.readFile(store.activePath, 'utf8'), before);
+      exportDialog = undefined;
+    }
+  }
+  await fs.writeFile(path.join(output, 'interface-language-matrix.json'), JSON.stringify({ passed: true, combinations: 4, callsUnchanged: interfaceCalls === JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations }) }));
   const quitBytes = await fs.readFile(store.activePath, 'utf8');
   app.once('will-quit', (event) => {
     event.preventDefault();

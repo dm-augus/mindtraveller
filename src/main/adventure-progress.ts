@@ -1,3 +1,4 @@
+import { AppTypeError } from '../shared/app-error';
 import { randomUUID } from 'node:crypto';
 import { rollCheck } from './action-resolution';
 import type { Adventure, CheckRecord, PendingChoice, StorySegment, StoryState } from '../shared/types';
@@ -51,7 +52,7 @@ export class AdventureProgress {
     return this.runExclusive(async () => {
       if (typeof segmentId !== 'string' || !segmentId.trim()
         || typeof choiceId !== 'string' || !choiceId.trim()) {
-        throw new TypeError('A source segment ID and choice ID are required.');
+        throw new AppTypeError('error.choiceId');
       }
       return this.selectChoiceState(choiceId, segmentId);
     });
@@ -68,9 +69,9 @@ export class AdventureProgress {
 
     const current = adventure.segments.at(-1);
     if (!current || current.selectedChoiceId !== null) throw new Error('No unselected story choices are available.');
-    if (segmentId !== undefined && segmentId !== current.id) throw new TypeError('The source story segment is no longer current.');
+    if (segmentId !== undefined && segmentId !== current.id) throw new AppTypeError('error.choiceStale');
     const choice = current.choices.find((available) => available.id === choiceId);
-    if (!choice) throw new TypeError('Unknown story choice.');
+    if (!choice) throw new AppTypeError('error.choiceUnknown');
 
     const pending: PendingChoice = { turnId: randomUUID(), choiceId: choice.id, choiceText: choice.text };
     const next: Adventure = {

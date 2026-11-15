@@ -2,9 +2,9 @@
 
 ## 1. Independent preferences and interface translation
 
-- [ ] 1.1 Extend application preference types, normalization, and queued partial-update persistence for interfaceLanguage and autoReadStory; update existing story-language consumers and verify defaults, legacy documents, concurrent updates, invalid fields, failed writes, restart, and unchanged adventure/provider data with preference tests.
-- [ ] 1.2 Add typed editable English/PT-BR catalogs, interpolation, and locale context; introduce stable application error identities and a main/preload result envelope without changing successful API return types; verify catalog/parameter parity, localized validation and IPC errors, unknown-error fallback, and secret-safe diagnostics.
-- [ ] 1.3 Localize all screens, rule explanations, check display, status/feedback, confirmations, accessibility labels, and app-owned native dialog strings; add interface-language Settings controls, document catalog editing and independent language settings, and verify immediate persisted switching, failed-selection recovery, both UI/story-language combinations, unchanged prompts, and unchanged Markdown export contents.
+- [x] 1.1 Extend application preference types, normalization, and queued partial-update persistence for interfaceLanguage and autoReadStory; update existing story-language consumers and verify defaults, legacy documents, concurrent updates, invalid fields, failed writes, restart, and unchanged adventure/provider data with preference tests.
+- [x] 1.2 Add typed editable English/PT-BR catalogs, interpolation, and locale context; introduce stable application error identities and a main/preload result envelope without changing successful API return types; verify catalog/parameter parity, localized validation and IPC errors, unknown-error fallback, and secret-safe diagnostics.
+- [x] 1.3 Localize all screens, rule explanations, check display, status/feedback, confirmations, accessibility labels, and app-owned native dialog strings; add interface-language Settings controls, document catalog editing and independent language settings, and verify immediate persisted switching, failed-selection recovery, both UI/story-language combinations, unchanged prompts, and unchanged Markdown export contents.
 
 ## 2. Character gender and portraits
 

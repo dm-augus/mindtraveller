@@ -20,7 +20,7 @@ declare global {
     mindtraveller: {
       exportHistory(): Promise<HistoryExportResult>;
       getStoryPreferences(): Promise<StoryPreferences>;
-      saveStoryPreferences(preferences: StoryPreferences): Promise<StoryPreferences>;
+      saveStoryPreferences(preferences: Partial<StoryPreferences>): Promise<StoryPreferences>;
       getAppInfo(): Promise<AppInfo>;
       quit(): Promise<void>;
       getProviderSettings(): Promise<ProviderSettings>;

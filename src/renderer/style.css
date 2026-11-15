@@ -24,6 +24,18 @@ button img { flex: 0 0 auto; object-fit: contain; image-rendering: pixelated; }
 }
 .branding-frame { border: 3px solid; border-color: #646773 #e9edf4 #e9edf4 #646773; background: #111022; margin-bottom: 10px; }
 .dice-artwork { width: 100%; max-height: 100px; display: block; object-fit: contain; image-rendering: pixelated; }
+.nav-button span { min-width: 0; overflow-wrap: anywhere; }
+html[lang="pt-BR"] .nav-button { font-size: 16px; }
+html[lang="pt-BR"] .nav-button[data-view="settings"] span {
+  font-size: 12px; white-space: nowrap; overflow-wrap: normal;
+}
+@media (min-width: 901px) and (max-width: 1099px) {
+  html[lang="pt-BR"] .nav-button[data-view="settings"] span { font-size: 10px; }
+}
+@media (max-width: 900px) {
+  html[lang="pt-BR"] .workspace { grid-template-columns: 192px minmax(0, 1fr); }
+  html[lang="pt-BR"] .nav-button { font-size: 14px; }
+}
 .main-navigation { display: grid; gap: 7px; }
 .retro-button {
   border: 3px solid; border-image: url('../assets/ui/button_normal_blank.png') 3 fill stretch;

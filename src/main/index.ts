@@ -1,3 +1,5 @@
+import { ipcResult } from '../shared/app-error';
+import { AppTypeError } from '../shared/app-error';
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -10,7 +12,7 @@ import { OllamaAdapter } from './providers/ollama';
 import { OpenAiAdapter } from './providers/openai';
 import { StoryController } from './story-controller';
 import { StoryPreferencesStore } from './story-preferences';
-import { AdventureOperationGate, HistoryExporter } from './history-export';
+import { AdventureOperationGate, HistoryExporter, localizedHistoryDialogOptions } from './history-export';
 const adventureOperations = new AdventureOperationGate();
 let activeStoryPreferences: StoryPreferencesStore | null = null;
 function preferencesStore(): StoryPreferencesStore {
@@ -65,87 +67,93 @@ function assertTrustedRequest(event: IpcMainInvokeEvent, args: unknown[], expect
   }
 }
 
-ipcMain.handle('app:get-info', (event, ...args: unknown[]) => {
+function handle(channel: string, action: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown): void {
+  ipcMain.handle(channel, (event, ...args: unknown[]) => ipcResult(() => action(event, ...args)));
+}
+
+handle('app:get-info', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   const info: AppInfo = { version: app.getVersion() };
   return info;
 });
 
-ipcMain.handle('app:quit', (event, ...args: unknown[]) => {
+handle('app:quit', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   setImmediate(() => app.quit());
 });
 
-ipcMain.handle('preferences:get', (event, ...args: unknown[]) => {
+handle('preferences:get', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   return preferencesStore().get();
 });
-ipcMain.handle('preferences:save', (event, ...args: unknown[]) => {
+handle('preferences:save', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 1);
   return preferencesStore().save(args[0]);
 });
 
-ipcMain.handle('settings:get', (event, ...args: unknown[]) => {
+handle('settings:get', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   return settingsStore().getPublicSettings();
 });
 
-ipcMain.handle('settings:save', (event, ...args: unknown[]) => {
+handle('settings:save', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 1);
   return settingsStore().saveConfiguration(args[0]);
 });
 
-ipcMain.handle('settings:set-openai-key', (event, ...args: unknown[]) => {
+handle('settings:set-openai-key', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 2);
   return settingsStore().setOpenAiKey(args[0], args[1]);
 });
 
-ipcMain.handle('settings:list-models', (event, ...args: unknown[]) => {
+handle('settings:list-models', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 2);
   const [provider, address] = args;
   if (provider === 'ollama' && typeof address === 'string') return new OllamaAdapter(address).listModels();
   if (provider === 'openai' && address === null) return new OpenAiAdapter(settingsStore()).listModels();
-  throw new TypeError('Select a valid provider and server address.');
+  throw new AppTypeError('error.invalidProvider');
 });
 
-ipcMain.handle('story:new-request', (event, ...args: unknown[]) => {
+handle('story:new-request', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   return adventureOperations.run(() => newStory().request());
 });
 
-ipcMain.handle('story:new-resolve', (event, ...args: unknown[]) => {
+handle('story:new-resolve', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 2);
   return adventureOperations.run(() => newStory().resolve(args[0], args[1]));
 });
 
-ipcMain.handle('story:start-opening', (event, ...args: unknown[]) => {
+handle('story:start-opening', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 1);
   return adventureOperations.run(() => story().startOpening(args[0]));
 });
 
-ipcMain.handle('story:retry-opening', (event, ...args: unknown[]) => {
+handle('story:retry-opening', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   return adventureOperations.run(() => story().retryOpening());
 });
 
-ipcMain.handle('story:restore', (event, ...args: unknown[]) => {
+handle('story:restore', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   return story().restore();
 });
 
-ipcMain.handle('story:export-history', (event, ...args: unknown[]) => {
+handle('story:export-history', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args);
   const window = BrowserWindow.fromWebContents(event.sender)!;
   return new HistoryExporter(adventureStore(), adventureOperations,
-    (options) => dialog.showSaveDialog(window, options), () => newStory().hasPendingConfirmation).export();
+    async (options) => dialog.showSaveDialog(window,
+      localizedHistoryDialogOptions(options, (await preferencesStore().get()).interfaceLanguage)),
+    () => newStory().hasPendingConfirmation).export();
 });
 
-ipcMain.handle('story:submit-choice', (event, ...args: unknown[]) => {
+handle('story:submit-choice', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 2);
   return adventureOperations.run(() => story().submitChoice(args[0], args[1]));
 });
 
-ipcMain.handle('story:retry-turn', (event, ...args: unknown[]) => {
+handle('story:retry-turn', (event, ...args: unknown[]) => {
   assertTrustedRequest(event, args, 1);
   return adventureOperations.run(() => story().retryTurn(args[0]));
 });

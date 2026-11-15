@@ -1,3 +1,6 @@
+import { InterfaceLanguageSelector } from './InterfaceLanguageSelector';
+import { useLocale } from './LocaleContext';
+import type { MessageKey } from '../shared/i18n';
 import React, { useEffect, useState } from 'react';
 import { StoryLanguageSelector } from './StoryLanguageSelector';
 import type { ModelOption, ProviderConfiguration, ProviderKind, ProviderSettings } from '../shared/types';
@@ -14,13 +17,14 @@ const DEFAULTS: ProviderConfiguration = {
 };
 
 export function SettingsView({ settings, onSaved }: Props): React.JSX.Element {
+  const { t, label, errorText } = useLocale();
   const [form, setForm] = useState<ProviderConfiguration>(settings ?? DEFAULTS);
   const [models, setModels] = useState<Partial<Record<ProviderKind, ModelOption[]>>>({});
   const [key, setKey] = useState('');
   const [persistKey, setPersistKey] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState<MessageKey | ''>('');
+  const [error, setError] = useState<unknown>('');
 
   useEffect(() => { if (settings) setForm(settings); }, [settings]);
 
@@ -38,14 +42,14 @@ export function SettingsView({ settings, onSaved }: Props): React.JSX.Element {
         const result = await window.mindtraveller.setOpenAiKey(key, persistKey);
         setKey('');
         onSaved(await window.mindtraveller.getProviderSettings());
-        setFeedback(result.persisted ? 'Key saved securely.' : 'Key available for this session only.');
+        setFeedback(result.persisted ? 'settings.keySaved' : 'settings.sessionKey');
       }
       const list = await window.mindtraveller.listProviderModels(provider,
         provider === 'ollama' ? form.ollama.serverAddress : null);
       setModels((current) => ({ ...current, [provider]: list }));
-      if (list.length === 0) setFeedback('No models were found. Add a model to the provider, then refresh.');
+      if (list.length === 0) setFeedback('settings.empty');
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Unable to load models. Check the provider and try again.');
+      setError(failure);
     } finally { setBusy(false); }
   }
 
@@ -56,13 +60,13 @@ export function SettingsView({ settings, onSaved }: Props): React.JSX.Element {
       if (key.trim()) {
         const result = await window.mindtraveller.setOpenAiKey(key, persistKey);
         setKey('');
-        if (!result.persisted) setFeedback('Settings saved. The OpenAI key is available for this session only.');
+        if (!result.persisted) setFeedback('settings.sessionSaved');
       }
       const saved = await window.mindtraveller.saveProviderConfiguration(form);
       onSaved(saved);
-      setFeedback((current) => current || 'Storyteller settings saved. New story operations will use this selection.');
+      setFeedback((current) => current || 'settings.saved');
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Unable to save settings. Try again.');
+      setError(failure);
     } finally { setBusy(false); }
   }
 
@@ -70,48 +74,49 @@ export function SettingsView({ settings, onSaved }: Props): React.JSX.Element {
   const options = models[provider] ?? [];
   const selected = form[provider].modelId;
   const visibleOptions = selected && !options.some((option) => option.id === selected)
-    ? [{ id: selected, label: `${selected} (saved selection)` }, ...options] : options;
+    ? [{ id: selected, label: t('settings.savedSelection', { model: selected }) }, ...options] : options;
 
   return <form className="settings-content" onSubmit={(event) => { void save(event); }}>
-    <div className="page-introduction"><p className="eyebrow">The voice behind your adventure</p>
-      <h2>Your storyteller</h2><p>Choose the provider and model used for new story and memory operations.</p></div>
+    <div className="page-introduction"><p className="eyebrow">{t('settings.tagline')}</p>
+      <h2>{t('settings.title')}</h2><p>{t('settings.help')}</p></div>
+    <InterfaceLanguageSelector disabled={busy} />
     <StoryLanguageSelector disabled={busy} />
-    <fieldset className="setup-group"><legend>Provider</legend>
+    <fieldset className="setup-group"><legend>{t('settings.provider')}</legend>
       <div className="setup-options method-options">{(['ollama', 'openai'] as const).map((option) =>
         <label key={option} className={`setup-option${provider === option ? ' is-selected' : ''}`}>
           <input type="radio" name="provider" value={option} checked={provider === option} onChange={() => updateProvider(option)} disabled={busy} />
           <span><strong>{option === 'ollama' ? 'Ollama' : 'OpenAI'}</strong>
-            <small>{option === 'ollama' ? 'A server on your computer or network' : 'Use your OpenAI API key'}</small></span>
+            <small>{option === 'ollama' ? t('settings.local') : t('settings.remote')}</small></span>
         </label>)}</div>
     </fieldset>
-    {provider === 'ollama' ? <fieldset className="setup-group"><legend>Ollama connection</legend>
-      <label className="settings-field">Server address
+    {provider === 'ollama' ? <fieldset className="setup-group"><legend>{t('settings.connection')}</legend>
+      <label className="settings-field">{t('settings.address')}
         <input value={form.ollama.serverAddress} onChange={(event) => {
           setForm((current) => ({ ...current, ollama: { ...current.ollama, serverAddress: event.target.value, modelId: null } }));
           setModels((current) => ({ ...current, ollama: undefined }));
         }} disabled={busy} required spellCheck={false} /></label>
-      <p className="setup-help">Start Ollama and pull a model before refreshing the list.</p>
-    </fieldset> : <fieldset className="setup-group"><legend>OpenAI key</legend>
-      <label className="settings-field">API key
+      <p className="setup-help">{t('settings.ollamaHelp')}</p>
+    </fieldset> : <fieldset className="setup-group"><legend>{t('settings.key')}</legend>
+      <label className="settings-field">{t('settings.apiKey')}
         <input type="password" value={key} onChange={(event) => setKey(event.target.value)} disabled={busy}
-          autoComplete="off" spellCheck={false} placeholder={settings?.openai.hasSavedKey ? 'Saved key available' : 'Enter a key'} /></label>
-      <label className="settings-check"><input type="checkbox" checked={persistKey} onChange={(event) => setPersistKey(event.target.checked)} disabled={busy} /> Save securely on this Windows account</label>
-      <p className="setup-help">{settings?.openai.hasSavedKey ? 'A saved key is available. Its value is never shown here.' : 'No saved key. Enter one to discover models or use OpenAI.'}</p>
+          autoComplete="off" spellCheck={false} placeholder={settings?.openai.hasSavedKey ? t('settings.savedKey') : t('settings.enterKey')} /></label>
+      <label className="settings-check"><input type="checkbox" checked={persistKey} onChange={(event) => setPersistKey(event.target.checked)} disabled={busy} /> {t('settings.persistKey')}</label>
+      <p className="setup-help">{settings?.openai.hasSavedKey ? t('settings.keyHelp') : t('settings.noKey')}</p>
     </fieldset>}
-    <fieldset className="setup-group"><legend>Model</legend>
+    <fieldset className="setup-group"><legend>{t('settings.model')}</legend>
       <button className="retro-button settings-button" type="button" onClick={() => { void discover(); }} disabled={busy}>
-        {busy ? 'Connecting…' : 'Refresh available models'}</button>
-      <label className="settings-field">Selected model
+        {busy ? t('settings.connecting') : t('settings.refresh')}</button>
+      <label className="settings-field">{t('settings.selected')}
         <select value={selected ?? ''} onChange={(event) => setForm((current) => ({ ...current,
           [provider]: { ...current[provider], modelId: event.target.value || null }
         }))} disabled={busy || visibleOptions.length === 0}>
-          <option value="">Select a model</option>
+          <option value="">{t('settings.select')}</option>
           {visibleOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select></label>
-      {provider === 'openai' && <p className="setup-help">Choose a model that supports the Responses API and JSON output.</p>}
+      {provider === 'openai' && <p className="setup-help">{t('settings.modelHelp')}</p>}
     </fieldset>
-    {error && <p className="settings-error" role="alert">{error}</p>}
-    {feedback && <p className="settings-feedback" role="status">{feedback}</p>}
-    <button className="retro-button settings-button" type="submit" disabled={busy || !form[provider].modelId}>Save storyteller settings</button>
+    {Boolean(error) && <p className="settings-error" role="alert">{errorText(error)}</p>}
+    {feedback && <p className="settings-feedback" role="status">{t(feedback || 'settings.saved')}</p>}
+    <button className="retro-button settings-button" type="submit" disabled={busy || !form[provider].modelId}>{t('settings.save')}</button>
   </form>;
 }

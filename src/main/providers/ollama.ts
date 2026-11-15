@@ -1,3 +1,4 @@
+import { AppTypeError } from '../../shared/app-error';
 import {
   ProviderContractError,
   parseActionAssessmentResponse,
@@ -34,20 +35,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function normalizeOllamaAddress(input: string): string {
-  if (typeof input !== 'string' || !input.trim()) throw new TypeError('Enter an Ollama server address.');
+  if (typeof input !== 'string' || !input.trim()) throw new AppTypeError('error.address');
   const address = input.trim();
   const withScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(address) ? address : `http://${address}`;
   let url: URL;
   try {
     url = new URL(withScheme);
   } catch {
-    throw new TypeError('Enter a valid Ollama server address.');
+    throw new AppTypeError('error.addressInvalid');
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new TypeError('Ollama server address must use HTTP or HTTPS.');
+    throw new AppTypeError('error.addressProtocol');
   }
   if (!url.hostname || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
-    throw new TypeError('Ollama server address must be a server origin without credentials or a path.');
+    throw new AppTypeError('error.addressOrigin');
   }
   return url.origin;
 }

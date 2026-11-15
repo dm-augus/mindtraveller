@@ -1,6 +1,7 @@
 import { ALLOCATION_BUDGETS, ATTRIBUTE_NAMES, ATTRIBUTE_RANGES } from './rules';
 import type { AllocationMethod, Attributes, Character, Nature, Theme, StoryLanguage } from './types';
 import { isStoryLanguage } from './story-language';
+import { formatMessage, type MessageRef } from './i18n';
 
 export { ATTRIBUTE_NAMES, ATTRIBUTE_RANGES } from './rules';
 
@@ -9,7 +10,11 @@ export const NATURES = ['Good', 'Neutral', 'Bad'] as const satisfies readonly Na
 export const ALLOCATION_METHODS = ['Balanced', 'Simplified'] as const satisfies readonly AllocationMethod[];
 export type ValidationResult<T> =
   | { valid: true; value: T }
-  | { valid: false; errors: string[] };
+  | { valid: false; errors: string[]; issues: MessageRef[] };
+
+function invalid(issues: MessageRef[]): { valid: false; errors: string[]; issues: MessageRef[] } {
+  return { valid: false, errors: issues.map(issue => formatMessage('en', issue)), issues };
+}
 
 export interface CharacterSetup {
   language: StoryLanguage;
@@ -37,58 +42,55 @@ function isOneOf<T extends string>(value: unknown, options: readonly T[]): value
 }
 
 export function validateAttributeAllocation(method: unknown, input: unknown): ValidationResult<Attributes> {
-  const errors: string[] = [];
+  const issues: MessageRef[] = [];
   const allocationMethod = isOneOf(method, ALLOCATION_METHODS) ? method : null;
-  if (allocationMethod === null) errors.push('Select Balanced or Simplified allocation.');
-  if (!isRecord(input)) return { valid: false, errors: [...errors, 'Provide all six attributes.'] };
+  if (allocationMethod === null) issues.push({ key: 'validation.method' });
+  if (!isRecord(input)) return invalid([...issues, { key: 'validation.attributes' }]);
 
   const attributes = createInitialAttributes();
   for (const name of ATTRIBUTE_NAMES) {
     const value = input[name];
     const { min, max } = ATTRIBUTE_RANGES[name];
     if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
-      errors.push(`${name} must be an integer from ${min} to +${max}.`);
+      issues.push({ key: 'validation.range', params: { attribute: name, min, max } });
     } else {
       attributes[name] = value;
     }
   }
   for (const name of Object.keys(input)) {
-    if (!isOneOf(name, ATTRIBUTE_NAMES)) errors.push(`Unknown attribute: ${name}.`);
+    if (!isOneOf(name, ATTRIBUTE_NAMES)) issues.push({ key: 'validation.unknownAttribute', params: { attribute: name } });
   }
 
-  if (errors.length > 0 || allocationMethod === null) return { valid: false, errors };
+  if (issues.length > 0 || allocationMethod === null) return invalid(issues);
 
   const values = ATTRIBUTE_NAMES.map((name) => attributes[name]);
   const positivePoints = values.reduce((sum, value) => sum + Math.max(0, value), 0);
   const negativePoints = values.reduce((sum, value) => sum + Math.max(0, -value), 0);
   const { positive: expectedPositive, negative: expectedNegative } = ALLOCATION_BUDGETS[allocationMethod];
   if (positivePoints !== expectedPositive || negativePoints !== expectedNegative) {
-    return {
-      valid: false,
-      errors: [`${method} allocation requires ${expectedPositive} positive and ${expectedNegative} negative points.`]
-    };
+    return invalid([{ key: 'validation.budget', params: { method: allocationMethod, positive: expectedPositive, negative: expectedNegative } }]);
   }
   return { valid: true, value: attributes };
 }
 
 export function validateCharacterSetup(input: unknown): ValidationResult<CharacterSetup> {
-  if (!isRecord(input)) return { valid: false, errors: ['Provide a character setup.'] };
-  const errors: string[] = [];
-  if (!isOneOf(input.theme, THEMES)) errors.push('Select Horror, Romance, or High Fantasy.');
+  if (!isRecord(input)) return invalid([{ key: 'validation.setup' }]);
+  const issues: MessageRef[] = [];
+  if (!isOneOf(input.theme, THEMES)) issues.push({ key: 'validation.theme' });
   const language = 'language' in input ? input.language : 'en';
-  if (!isStoryLanguage(language)) errors.push('Select English or Português.');
+  if (!isStoryLanguage(language)) issues.push({ key: 'validation.language' });
 
   const character = input.character;
-  if (!isRecord(character)) return { valid: false, errors: [...errors, 'Provide character details.'] };
+  if (!isRecord(character)) return invalid([...issues, { key: 'validation.details' }]);
   const name = typeof character.name === 'string' ? character.name.trim() : '';
   const gender = typeof character.gender === 'string' ? character.gender.trim() : '';
-  if (!name) errors.push('Enter a character name.');
-  if (!gender) errors.push('Enter a gender.');
-  if (!isOneOf(character.nature, NATURES)) errors.push('Select Good, Neutral, or Bad Nature.');
+  if (!name) issues.push({ key: 'validation.name' });
+  if (!gender) issues.push({ key: 'validation.gender' });
+  if (!isOneOf(character.nature, NATURES)) issues.push({ key: 'validation.nature' });
 
   const allocation = validateAttributeAllocation(character.allocationMethod, character.attributes);
-  if (!allocation.valid) errors.push(...allocation.errors);
-  if (errors.length > 0 || !allocation.valid) return { valid: false, errors };
+  if (!allocation.valid) issues.push(...allocation.issues);
+  if (issues.length > 0 || !allocation.valid) return invalid(issues);
 
   return {
     valid: true,

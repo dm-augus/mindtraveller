@@ -1,3 +1,4 @@
+import { AppError, AppTypeError } from '../shared/app-error';
 import { randomUUID } from 'node:crypto';
 import { validateCharacterSetup } from '../shared/character-rules';
 import {
@@ -32,7 +33,7 @@ export class StoryController {
   }
 
   private async runGeneration<T>(action: () => Promise<T>): Promise<T> {
-    if (this.generationInFlight) throw new Error('Story generation is already pending.');
+    if (this.generationInFlight) throw new AppError('error.storyBusy');
     this.generationInFlight = true;
     try {
       return await action();
@@ -48,9 +49,9 @@ export class StoryController {
   startOpening(input: unknown): Promise<Adventure> {
     return this.runGeneration(async () => {
       const setup = validateCharacterSetup(input);
-      if (!setup.valid) throw new TypeError(setup.errors.join(' '));
+      if (!setup.valid) throw new AppTypeError(setup.issues[0].key, setup.issues[0].params);
       if (await this.store.load() !== null) {
-        throw new Error('An adventure is already saved. Confirm New Story before replacing it.');
+        throw new AppError('error.storyExists');
       }
       const pending: Adventure = {
         schemaVersion: 1,
@@ -78,7 +79,7 @@ export class StoryController {
     return this.runGeneration(async () => {
       const pending = await this.store.load();
       if (!pending || pending.phase.kind !== 'pending-opening' || pending.segments.length || pending.premise !== null) {
-        throw new Error('No opening is awaiting generation.');
+        throw new AppError('error.noOpening');
       }
       const selected = await this.providerSource();
       return this.generateOpening(pending, selected, this.openingRequest(pending, selected));
@@ -91,14 +92,14 @@ export class StoryController {
 
   retryTurn(turnId: unknown): Promise<ChoiceTurnResult> {
     return this.runGeneration(async () => {
-      if (typeof turnId !== 'string' || !turnId.trim()) throw new TypeError('A pending turn ID is required.');
+      if (typeof turnId !== 'string' || !turnId.trim()) throw new AppTypeError('error.turnId');
       const pending = await this.store.load();
       if (pending?.phase.kind === 'pending-summary' && pending.phase.turnId === turnId) {
         return { kind: 'continued', adventure: await this.finishSummaries(pending) };
       }
       if (!pending || (pending.phase.kind !== 'pending-assessment' && pending.phase.kind !== 'pending-narration')
         || pending.phase.choice.turnId !== turnId) {
-        throw new Error('No matching turn awaits resolution.');
+        throw new AppError('error.noTurn');
       }
       return pending.phase.kind === 'pending-narration' ? this.narrateTurn(pending) : this.assessTurn(pending);
     });
@@ -117,7 +118,7 @@ export class StoryController {
       const current = await this.store.load();
       if (!current || current.id !== pending.id || current.phase.kind !== 'pending-narration'
         || current.phase.choice.turnId !== pending.phase.choice.turnId) {
-        throw new Error('The saved adventure changed. Restore the current adventure before retrying.');
+        throw new AppError('error.saveChanged');
       }
       return this.narrateTurn(current);
     }
@@ -194,7 +195,7 @@ export class StoryController {
     selected: SelectedStoryProvider,
     request: ReturnType<StoryContextBuilder['openingRequest']>
   ): Promise<Adventure> {
-    if (pending.phase.kind !== 'pending-opening') throw new Error('No opening is awaiting generation.');
+    if (pending.phase.kind !== 'pending-opening') throw new AppError('error.noOpening');
     const response = parseOpeningResponse(await selected.provider.generateOpening(request), request.choiceTarget);
     const createdAt = new Date().toISOString();
     const completed: Adventure = {

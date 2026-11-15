@@ -1,4 +1,8 @@
-# Mindtraveller: story language
+# Mindtraveller: interface and story language
+
+In **Settings → Interface language**, choose **English** or **Português (Brasil)**. A successful save updates all application screens immediately and persists across restart. If saving fails, the previous selection stays active and the app shows an error. Older preferences default to an English interface.
+
+Interface language is separate from **Language for new stories** and the language saved in an existing adventure. Switching the interface does not translate your story, change its choices or rolls, change model instructions, or change the Markdown export contents. Provider/model names, player names, and original free-text gender values remain as entered. Native operating-system dialog chrome follows Windows; app-owned export titles and filter labels follow the selected interface language.
 
 The compact sidebar contains navigation and character information. Genre, chapter, story language, and Export History appear together above the narrative. The story and decision areas scroll separately; long choices wrap, and pending roll details and Retry remain reachable within the decision area.
 
@@ -18,7 +22,7 @@ The app also rejects response-field syntax accidentally embedded in narrative te
 
 Ollama requests an 8,192-token context window and reserves 1,536 tokens for output plus a 256-token safety margin. The app checks the estimated size of all messages, including retry instructions, before sending. It starts summaries earlier and reports an error if required context still does not fit. With the model loaded, run `ollama ps` to inspect the allocated `CONTEXT` column. The model and available memory must support the requested window; a larger window uses more memory. No extra review call is added to ordinary turns.
 
-Interface labels and game-rule identifiers remain in English. Existing story text and player names are preserved. Language selection instructs the model; prose quality and adherence still depend on the chosen model. It does not translate older passages automatically.
+Interface labels and rule explanations follow the interface language; underlying rule identifiers remain canonical. Existing story text and player names are preserved. Story-language selection instructs the model; prose quality and adherence still depend on the chosen model. It does not translate older passages automatically.
 
 ## Export history
 

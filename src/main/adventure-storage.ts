@@ -1,3 +1,4 @@
+import { AppError } from '../shared/app-error';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -107,7 +108,7 @@ export class AdventureStore {
     const backup = await this.readDocument(this.backupPath);
     if (backup.kind === 'valid') return backup.adventure;
     if (active.kind === 'missing' && backup.kind === 'missing') return null;
-    throw new Error('No valid adventure save or last-known-good backup is available.');
+    throw new AppError('error.saveCorrupt');
   }
 
   async load(): Promise<Adventure | null> {
@@ -130,7 +131,7 @@ export class AdventureStore {
     // Check and replace inside the same queue used by saves and New Story discard.
     const write = this.writes.catch(() => undefined).then(async () => {
       if (!isDeepStrictEqual(await this.readVisibleAdventure(), snapshot)) {
-        throw new Error('The saved adventure changed. Restore the current adventure before retrying.');
+        throw new AppError('error.saveChanged');
       }
       await this.writeDocument(text);
     });

@@ -1,4 +1,8 @@
 const { app } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+fs.mkdirSync(path.resolve('out'), { recursive: true });
+app.setPath('userData', fs.mkdtempSync(path.resolve('out/security-profile-')));
 
 const timeout = setTimeout(() => {
   console.error('Security smoke test timed out');
@@ -15,9 +19,9 @@ app.on('browser-window-created', (_event, window) => {
         bridgeKeys: Object.keys(window.mindtraveller ?? {}).sort(),
         version: (await window.mindtraveller.getAppInfo()).version,
         invalidChoiceRejected: await window.mindtraveller.submitChoice(null, 'wait')
-          .then(() => false, (error) => /segment ID and choice ID/.test(error.message)),
+          .then(() => false, (error) => error.message.includes('"key":"error.choiceId"')),
         invalidTurnRejected: await window.mindtraveller.retryTurn(null)
-          .then(() => false, (error) => /pending turn ID/.test(error.message)),
+          .then(() => false, (error) => error.message.includes('"key":"error.turnId"')),
         invalidPreferencesRejected: await window.mindtraveller.saveStoryPreferences({ defaultStoryLanguage: 'fr' })
           .then(() => false, () => true),
         csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content

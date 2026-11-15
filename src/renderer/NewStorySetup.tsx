@@ -1,3 +1,6 @@
+import { formatMessage } from '../shared/i18n';
+import { useLocale } from './LocaleContext';
+import type { MessageKey } from '../shared/i18n';
 import React, { useState } from 'react';
 import { StoryLanguageSelector } from './StoryLanguageSelector';
 import type { StoryLanguage } from '../shared/types';
@@ -9,10 +12,10 @@ import { ALLOCATION_BUDGETS } from '../shared/rules';
 import type { CharacterSetup } from '../shared/character-rules';
 import type { AllocationMethod, AttributeName, Attributes, Nature, Theme } from '../shared/types';
 
-const THEME_DESCRIPTIONS: Record<Theme, string> = {
-  Horror: 'Ancient secrets, haunted places, and the unknown.',
-  Romance: 'Unexpected encounters, loyalties, and matters of the heart.',
-  'High Fantasy': 'Magic, mythical creatures, and extraordinary quests.'
+const THEME_DESCRIPTIONS: Record<Theme, MessageKey> = {
+  Horror: 'setup.horror',
+  Romance: 'setup.romance',
+  'High Fantasy': 'setup.fantasy'
 };
 
 interface NewStorySetupProps {
@@ -21,6 +24,7 @@ interface NewStorySetupProps {
 }
 
 export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.Element {
+  const { t, label, errorText, preferences } = useLocale();
   const [language, setLanguage] = useState<StoryLanguage | null>(null);
   const [preferenceBusy, setPreferenceBusy] = useState(true);
   const [theme, setTheme] = useState<Theme | ''>('');
@@ -57,72 +61,72 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
 
   return <form className="new-story-setup" onSubmit={submit} data-setup-valid={setup.valid}>
     <div className="page-introduction">
-      <p className="eyebrow">Turn the first page</p><h2>Who will you become?</h2>
-      <p>Choose a medieval world, create your traveller, and begin your adventure.</p>
+      <p className="eyebrow">{t('setup.tagline')}</p><h2>{t('setup.title')}</h2>
+      <p>{t('setup.help')}</p>
     </div>
 
     <StoryLanguageSelector disabled={busy} onLanguageChange={setLanguage} onBusyChange={setPreferenceBusy} />
-    <fieldset className="setup-group"><legend>Choose your world</legend>
+    <fieldset className="setup-group"><legend>{t('setup.world')}</legend>
       <div className="setup-options theme-options">{THEMES.map((option) =>
         <label key={option} className={`setup-option${theme === option ? ' is-selected' : ''}`}>
           <input type="radio" name="theme" value={option} checked={theme === option}
             onChange={() => setTheme(option)} disabled={busy} required />
-          <span><strong>{option}</strong><small>{THEME_DESCRIPTIONS[option]}</small></span>
+          <span><strong>{label(option)}</strong><small>{t(THEME_DESCRIPTIONS[option])}</small></span>
         </label>
       )}</div>
     </fieldset>
 
-    <fieldset className="setup-group"><legend>Allocate attributes</legend>
-      <p className="setup-help">Every attribute begins at 0. Choose a method, then set the final values.</p>
+    <fieldset className="setup-group"><legend>{t('setup.attributes')}</legend>
+      <p className="setup-help">{t('setup.attributeHelp')}</p>
       <div className="setup-options method-options">{ALLOCATION_METHODS.map((option) =>
         <label key={option} className={`setup-option${method === option ? ' is-selected' : ''}`}>
           <input type="radio" name="allocation-method" value={option} checked={method === option}
             onChange={() => selectMethod(option)} disabled={busy} required />
-          <span><strong>{option}</strong><small>{option === 'Balanced'
-            ? '5 positive points and 2 negative points'
-            : '3 positive points and no negative points'}</small></span>
+          <span><strong>{label(option)}</strong><small>{option === 'Balanced'
+            ? t('setup.balanced')
+            : t('setup.simplified')}</small></span>
         </label>
       )}</div>
       <div className="attribute-grid">{ATTRIBUTE_NAMES.map((attribute) => {
         const range = ATTRIBUTE_RANGES[attribute];
         return <label key={attribute} className="attribute-field">
-          <span>{attribute}</span>
+          <span>{label(attribute)}</span>
           <select value={attributes[attribute]} disabled={busy || !method}
             onChange={(event) => setAttribute(attribute, Number(event.target.value))}
-            aria-label={`${attribute} value`}>
+            aria-label={t('setup.attributeValue', { attribute })}>
             {Array.from({ length: range.max - range.min + 1 }, (_, index) => range.min + index).map((value) =>
               <option key={value} value={value}>{value > 0 ? `+${value}` : value}</option>)}</select>
-          <small>{range.min} to +{range.max}</small>
+          <small>{t('setup.range', { min: range.min, max: range.max })}</small>
         </label>;
       })}</div>
       <p className={`allocation-status${method && !allocation.valid ? ' is-invalid' : ''}`}
         role="status">{budget
-          ? `Positive points: ${positive}/${budget.positive} · Negative points: ${negative}/${budget.negative}`
-          : 'Choose Balanced or Simplified to allocate your attributes.'}</p>
-      {method && !allocation.valid && <p className="setup-feedback">{allocation.errors.join(' ')}</p>}
+          ? t('setup.budget', { positive, expectedPositive: budget.positive, negative, expectedNegative: budget.negative })
+          : t('setup.chooseMethod')}</p>
+      {method && !allocation.valid && <p className="setup-feedback">{allocation.issues.map(issue => formatMessage(preferences.interfaceLanguage, issue)).join(' ')}</p>}
     </fieldset>
 
-    <fieldset className="setup-group"><legend>Name your traveller</legend>
+    <fieldset className="setup-group"><legend>{t('setup.identity')}</legend>
       <div className="identity-grid">
-        <label>Name<input type="text" value={name} onChange={(event) => setName(event.target.value)}
+        <label>{t('setup.name')}<input type="text" value={name} onChange={(event) => setName(event.target.value)}
           disabled={busy} maxLength={80} autoComplete="off" required /></label>
-        <label>Gender<input type="text" value={gender} onChange={(event) => setGender(event.target.value)}
+        <label>{t('setup.gender')}<input type="text" value={gender} onChange={(event) => setGender(event.target.value)}
           disabled={busy} maxLength={80} autoComplete="off" required /></label>
       </div>
-      <p className="setup-help">Choose your Nature. It shapes story suggestions, but never restricts your choices or changes a roll.</p>
+      <p className="setup-help">{t('setup.natureHelp')}</p>
       <div className="setup-options nature-options">{NATURES.map((option) =>
         <label key={option} className={`setup-option${nature === option ? ' is-selected' : ''}`}>
           <input type="radio" name="nature" value={option} checked={nature === option}
             onChange={() => setNature(option)} disabled={busy} required />
-          <span><strong>{option}</strong></span>
+          <span><strong>{label(option)}</strong></span>
         </label>
       )}</div>
     </fieldset>
 
     <div className="setup-actions">
-      <p>{setup.valid ? 'Your traveller is ready.' : 'Complete every field and match the allocation budget to begin.'}</p>
+      <p>{setup.valid ? t('setup.ready') : t('setup.incomplete')}</p>
       <button className="retro-button setup-start" type="submit" disabled={busy || preferenceBusy || !setup.valid}>
-        {busy ? 'Opening your story…' : 'Begin story'}
+        {busy ? t('story.opening') : t('setup.begin')}
       </button>
     </div>
   </form>;
