@@ -3,6 +3,13 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { AdventureStore } = require('../dist/main/adventure-storage.js');
 const { validateCharacterSetup } = require('../dist/shared/character-rules.js');
+const { normalizeStoryMemory } = require('../dist/shared/story-memory.js');
+
+function withMemory(adventure) {
+  const normalized = structuredClone(adventure);
+  normalizeStoryMemory(normalized);
+  return normalized;
+}
 
 function memoryFiles() {
   const documents = new Map();
@@ -33,7 +40,7 @@ for (const phase of [{ kind: 'ready' }, { kind: 'pending-opening', turnId: 'turn
     const old = legacy(phase), bytes = JSON.stringify(old);
     files.documents.set(store.activePath, bytes);
     const loaded = await store.load();
-    assert.deepEqual(loaded, { ...old, language: 'en' });
+    assert.deepEqual(loaded, withMemory({ ...old, language: 'en' }));
     assert.equal(files.documents.get(store.activePath), bytes);
     await store.saveIfUnchanged(old, { ...loaded, updatedAt: 'later' });
     assert.deepEqual((await store.load()).phase, phase);
@@ -52,7 +59,7 @@ test('explicit language validation and Portuguese round-trip', async () => {
     await assert.rejects(store.save({ ...adventure, language }));
   }
   await store.save(adventure);
-  assert.deepEqual(await store.load(), adventure);
+  assert.deepEqual(await store.load(), withMemory(adventure));
   files.documents.set(store.activePath, JSON.stringify({ ...adventure, language: 'fr' }));
   await assert.rejects(store.load(), /No valid adventure/);
 });

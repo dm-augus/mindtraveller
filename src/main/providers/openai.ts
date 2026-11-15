@@ -18,6 +18,7 @@ import {
 import { ProviderError } from '../../shared/provider-error';
 import type { ModelOption } from '../../shared/types';
 import { withResponseRetries } from './response-retries';
+import { validateFreshContinuation, withContinuationGuidance } from './story-continuation';
 import {
   assessmentMessages,
   checkedNarrationMessages,
@@ -151,10 +152,10 @@ export class OpenAiAdapter implements StoryProvider {
   }
 
   private async generate<T>(model: string, messages: ProviderMessage[], parse: (content: unknown) => T): Promise<T> {
-    return withResponseRetries(this.kind, async () => {
+    return withResponseRetries(this.kind, async (previousError) => {
       const response = await this.request('responses', {
         model: modelId(model),
-        input: messages,
+        input: withContinuationGuidance(messages, previousError),
         text: { format: { type: 'json_object' } },
         store: false
       });
@@ -169,12 +170,16 @@ export class OpenAiAdapter implements StoryProvider {
 
   async assessAction(request: ActionAssessmentRequest): Promise<ActionAssessmentResponse> {
     return this.generate(request.modelId, assessmentMessages(request),
-      (content) => parseActionAssessmentResponse(content, request.choiceTarget, request.attributes));
+      (content) => {
+        const response = parseActionAssessmentResponse(content, request.choiceTarget, request.attributes);
+        return response.kind === 'no-check' ? validateFreshContinuation(response, request.context, request.recentNarratives) : response;
+      });
   }
 
   async narrateCheck(request: CheckedNarrationRequest): Promise<CheckedNarrationResponse> {
     return this.generate(request.modelId, checkedNarrationMessages(request),
-      (content) => parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome));
+      (content) => validateFreshContinuation(
+        parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome), request.context, request.recentNarratives));
   }
 
   async summarize(request: SummaryRequest): Promise<SummaryResponse> {

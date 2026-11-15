@@ -12,7 +12,7 @@ async function temporaryUserData(t) {
     if (path.dirname(directory) !== base || !path.basename(directory).startsWith('mindtraveller-storage-')) {
       throw new Error('Refusing to remove a directory outside this test fixture.');
     }
-    await fs.rm(directory, { recursive: true, force: true });
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   });
   return directory;
 }
@@ -37,6 +37,8 @@ function adventure(id) {
       }
     },
     premise: 'The gate is opening.',
+    mainObjective: 'Discover why the gate is opening.',
+    storyState: { location: 'The gate', situation: 'The road reaches the gate.', currentFocus: null },
     segments: [{
       id: 'segment-1',
       chapterNumber: 1,

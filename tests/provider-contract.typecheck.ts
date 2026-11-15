@@ -44,11 +44,11 @@ const unsupportedLanguage: OpeningRequest = { ...opening, language: 'fr' };
 const provider: StoryProvider = {
   kind: 'ollama',
   listModels: async () => [{ id: 'local-story', label: 'Local Story' }],
-  generateOpening: async () => ({ premise: 'A bell rings.', narrative: 'The gate opens.', choices }),
+  generateOpening: async () => ({ mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A bell rings.', narrative: 'The gate opens.', choices }),
   assessAction: async (): Promise<ActionAssessmentResponse> => ({
     kind: 'check', difficulty: 'Hard', attribute: 'Strength'
   }),
-  narrateCheck: async () => ({ outcome: 'success', narrative: 'The gate gives way.', choices }),
+  narrateCheck: async () => ({ storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices }),
   summarize: async () => ({ text: 'The gate opened.', keyFacts: [], unresolvedThreads: [] })
 };
 

@@ -17,7 +17,7 @@ const choice = { turnId: 'turn', choiceId: 'enter', choiceText: 'Entrar.' };
 const check = { difficulty: 'Hard', attribute: 'Strength', attributeValue: 3, baseThreshold: 20, threshold: 50, roll: 30, outcome: 'success' };
 const memory = { text: 'Mira chegou.', keyFacts: ['O portão abriu.'], unresolvedThreads: ['Encontrar o sino.'] };
 function adventure(language) {
-  return { schemaVersion: 1, id: 'story', language, theme: 'Horror', character, premise: 'Um sino.',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, schemaVersion: 1, id: 'story', language, theme: 'Horror', character, premise: 'Um sino.',
     segments: [{ id: 'scene', chapterNumber: 1, narrative: 'Um portão.', choices, selectedChoiceId: null, check: null, createdAt: '2026-11-14' }],
     chapterSummaries: [], globalSummary: '', phase: { kind: 'ready' }, updatedAt: '2026-11-14' };
 }
@@ -34,10 +34,10 @@ for (const language of ['en', 'pt-BR']) for (const kind of ['ollama', 'openai'])
       assert.match(messages[0].content, /Keep JSON field names/);
       if (['assessment', 'checked-narration'].includes(prompt.operation)) assert.match(messages[0].content, /Return a new set of choices/);
       const output = {
-        opening: { premise: 'Um sino.', narrative: 'Um portão.', choices },
+        opening: { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'Um sino.', narrative: 'Um portão.', choices },
         assessment: checkedAssessment ? { kind: 'check', difficulty: 'Hard', attribute: 'Strength' }
-          : { kind: 'no-check', narrative: 'Mira entra.', choices },
-        'checked-narration': { outcome: 'success', narrative: 'O portão abriu.', choices }, summary: memory
+          : { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'Mira entra.', choices },
+        'checked-narration': { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'O portão abriu.', choices }, summary: memory
       }[prompt.operation];
       if (prompt.operation === 'checked-narration') assert.deepEqual(prompt.check, check);
       return Response.json(kind === 'ollama' ? { done: true, message: { role: 'assistant', content: JSON.stringify(output) } }
@@ -108,11 +108,11 @@ for (const language of ['en', 'pt-BR']) for (const failure of ['opening', 'asses
         return output;
       }
       return { kind,
-        generateOpening: async (request) => receive('opening', request, { premise: 'Um sino.', narrative: 'Um portão.', choices }),
+        generateOpening: async (request) => receive('opening', request, { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'Um sino.', narrative: 'Um portão.', choices }),
         assessAction: async (request) => receive('assessment', request, failure === 'assessment'
-          ? { kind: 'no-check', narrative: 'Mira entrou.', choices }
+          ? { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'Mira entrou.', choices }
           : { kind: 'check', difficulty: 'Hard', attribute: 'Strength' }),
-        narrateCheck: async (request) => receive('narration', request, { outcome: request.check.outcome, narrative: 'Mira tentou abrir.', choices }),
+        narrateCheck: async (request) => receive('narration', request, { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: request.check.outcome, narrative: 'Mira tentou abrir.', choices }),
         summarize: async (request) => receive(request.kind, request, memory) };
     }
     const old = provider('ollama');

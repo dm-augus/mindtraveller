@@ -19,6 +19,8 @@ import { ProviderError } from '../../shared/provider-error';
 import { ATTRIBUTE_NAMES, DIFFICULTY_BASE_THRESHOLDS } from '../../shared/rules';
 import type { ModelOption } from '../../shared/types';
 import { withResponseRetries } from './response-retries';
+import { validateFreshContinuation, withContinuationGuidance } from './story-continuation';
+import { OLLAMA_GENERATION_OPTIONS, requireOllamaMessageBudget } from './ollama-budget';
 import {
   assessmentMessages,
   checkedNarrationMessages,
@@ -68,10 +70,15 @@ function chatContent(value: unknown): unknown {
 }
 
 const textField = { type: 'string', minLength: 1 };
+const nullableTextField = { anyOf: [textField, { type: 'null' }] };
 
 function objectSchema(properties: Record<string, unknown>): object {
   return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
 }
+
+const storyStateSchema = objectSchema({
+  location: nullableTextField, situation: textField, currentFocus: nullableTextField
+});
 
 function choicesField(count: number): object {
   return {
@@ -81,12 +88,14 @@ function choicesField(count: number): object {
 }
 
 function openingSchema(choiceTarget: number): object {
-  return objectSchema({ premise: textField, narrative: textField, choices: choicesField(choiceTarget) });
+  return objectSchema({ premise: textField, narrative: textField, choices: choicesField(choiceTarget),
+    mainObjective: textField, storyState: storyStateSchema });
 }
 
 function assessmentSchema(choiceTarget: number): object {
   return { oneOf: [
-    objectSchema({ kind: { const: 'no-check' }, narrative: textField, choices: choicesField(choiceTarget) }),
+    objectSchema({ kind: { const: 'no-check' }, narrative: textField, choices: choicesField(choiceTarget),
+      storyState: storyStateSchema }),
     objectSchema({
       kind: { const: 'check' },
       difficulty: { type: 'string', enum: Object.keys(DIFFICULTY_BASE_THRESHOLDS) },
@@ -96,7 +105,8 @@ function assessmentSchema(choiceTarget: number): object {
 }
 
 function narrationSchema(choiceTarget: number, outcome: 'success' | 'failure'): object {
-  return objectSchema({ outcome: { const: outcome }, narrative: textField, choices: choicesField(choiceTarget) });
+  return objectSchema({ outcome: { const: outcome }, narrative: textField, choices: choicesField(choiceTarget),
+    storyState: storyStateSchema });
 }
 
 const summarySchema = objectSchema({
@@ -181,10 +191,13 @@ export class OllamaAdapter implements StoryProvider {
   }
 
   private async chat<T>(model: string, messages: ProviderMessage[], format: object, parse: (content: unknown) => T): Promise<T> {
-    return withResponseRetries(this.kind, async () => {
+    return withResponseRetries(this.kind, async (previousError) => {
+      const attemptMessages = withContinuationGuidance(messages, previousError);
+      requireOllamaMessageBudget(attemptMessages);
       const response = await this.request('/api/chat', {
         model: modelId(model),
-        messages,
+        messages: attemptMessages,
+        options: OLLAMA_GENERATION_OPTIONS,
         stream: false,
         format
       });
@@ -199,12 +212,16 @@ export class OllamaAdapter implements StoryProvider {
 
   async assessAction(request: ActionAssessmentRequest): Promise<ActionAssessmentResponse> {
     return this.chat(request.modelId, assessmentMessages(request), assessmentSchema(request.choiceTarget),
-      (content) => parseActionAssessmentResponse(content, request.choiceTarget, request.attributes));
+      (content) => {
+        const response = parseActionAssessmentResponse(content, request.choiceTarget, request.attributes);
+        return response.kind === 'no-check' ? validateFreshContinuation(response, request.context, request.recentNarratives) : response;
+      });
   }
 
   async narrateCheck(request: CheckedNarrationRequest): Promise<CheckedNarrationResponse> {
     return this.chat(request.modelId, checkedNarrationMessages(request), narrationSchema(request.choiceTarget, request.check.outcome),
-      (content) => parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome));
+      (content) => validateFreshContinuation(
+        parseCheckedNarrationResponse(content, request.choiceTarget, request.check.outcome), request.context, request.recentNarratives));
   }
 
   async summarize(request: SummaryRequest): Promise<SummaryResponse> {

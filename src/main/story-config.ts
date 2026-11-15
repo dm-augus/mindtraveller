@@ -19,9 +19,9 @@ export const DEFAULT_STORY_CONFIGURATION: Readonly<StoryConfiguration> = Object.
   choiceTarget: 3,
   chapterLength: 10,
   recentEventCount: 6,
-  contextBudgetTokens: 8_000,
-  chapterSummaryThresholdTokens: 4_000,
-  globalSummaryThresholdTokens: 6_000
+  contextBudgetTokens: 5_000,
+  chapterSummaryThresholdTokens: 3_000,
+  globalSummaryThresholdTokens: 4_000
 });
 
 export function createStoryConfiguration(

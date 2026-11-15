@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { HistoryExporter, AdventureOperationGate } = require('../dist/main/history-export.js');
 function fixture() {
-  return { language: 'pt-BR', theme: 'Horror', character: { name: 'João:/?*', gender: 'Man', nature: 'Good', allocationMethod: 'Simplified',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, language: 'pt-BR', theme: 'Horror', character: { name: 'João:/?*', gender: 'Man', nature: 'Good', allocationMethod: 'Simplified',
     attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } },
     premise: 'Maldição.', segments: [{ chapterNumber: 1, narrative: 'Ação e coração.', choices: [{ id: 'a', text: 'Investigar.' }], selectedChoiceId: null, check: null }], phase: { kind: 'ready' } };
 }

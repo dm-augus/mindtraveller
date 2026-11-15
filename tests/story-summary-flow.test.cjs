@@ -17,7 +17,7 @@ const choices = [
 ];
 
 function adventure() {
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
@@ -45,16 +45,16 @@ function provider(options = {}) {
     kind: 'ollama', calls,
     generateOpening: async () => {
       calls.opening += 1;
-      return { premise: 'A new bell rings.', narrative: 'The road reaches the abbey.', choices };
+      return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A new bell rings.', narrative: 'The road reaches the abbey.', choices };
     },
     assessAction: async () => {
       calls.assessment += 1;
       return options.checked ? { kind: 'check', difficulty: 'Hard', attribute: 'Strength' }
-        : { kind: 'no-check', narrative: 'Mira waits. The abbess approaches.', choices };
+        : { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: `Mira waits. Visitor ${calls.assessment} approaches the abbey.`, choices };
     },
     narrateCheck: async (request) => {
       calls.narration += 1;
-      return { outcome: request.check.outcome, narrative: 'The gate gives way.', choices };
+      return { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: request.check.outcome, narrative: 'The gate gives way.', choices };
     },
     summarize: async (request) => {
       calls.summaries.push(structuredClone(request));
@@ -386,7 +386,7 @@ for (const kind of ['ollama', 'openai']) {
       let value;
       if (request.operation === 'assessment') {
         assessments += 1;
-        value = { kind: 'no-check', narrative: 'Mira greets the abbess.', choices };
+        value = { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'Mira greets the abbess.', choices };
       } else {
         assert.equal(request.operation, 'summary');
         assert.equal((await new AdventureStore(directory).load()).phase.kind, 'pending-summary');

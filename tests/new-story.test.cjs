@@ -13,13 +13,13 @@ async function temporaryUserData(t) {
     if (path.dirname(directory) !== base || !path.basename(directory).startsWith('mindtraveller-new-story-')) {
       throw new Error('Refusing to remove a directory outside this test fixture.');
     }
-    await fs.rm(directory, { recursive: true, force: true });
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   });
   return directory;
 }
 
 function adventure(id, narrative = 'The road reaches the gate.') {
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1,
     language: 'en', id,
     theme: 'High Fantasy',

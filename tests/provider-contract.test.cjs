@@ -26,19 +26,19 @@ function invalidResponse(action) {
 }
 
 test('opening and no-check responses accept distinct, well formed choices', () => {
-  const opening = {
+  const opening = { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     premise: 'An ancient bell wakes the abbey.',
     narrative: 'The road leads to a locked gate.',
     choices
   };
   assert.deepEqual(parseOpeningResponse(opening, 3), opening);
 
-  const continuation = { kind: 'no-check', narrative: 'You wait as dawn rises.', choices };
+  const continuation = { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'You wait as dawn rises.', choices };
   assert.deepEqual(parseActionAssessmentResponse(continuation, 3, attributes), continuation);
 });
 
 test('choice schemas reject missing fields, blanks, duplicates, extras, and wrong counts', () => {
-  const opening = { premise: 'A premise.', narrative: 'A scene.', choices };
+  const opening = { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A premise.', narrative: 'A scene.', choices };
   const invalidChoices = [
     choices.slice(0, 2),
     [choices[0], choices[1], { text: 'Another action.' }],
@@ -49,7 +49,7 @@ test('choice schemas reject missing fields, blanks, duplicates, extras, and wron
   ];
   for (const invalid of invalidChoices) {
     invalidResponse(() => parseOpeningResponse({ ...opening, choices: invalid }, 3));
-    invalidResponse(() => parseActionAssessmentResponse({ kind: 'no-check', narrative: 'A scene.', choices: invalid }, 3, attributes));
+    invalidResponse(() => parseActionAssessmentResponse({ storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'A scene.', choices: invalid }, 3, attributes));
   }
   invalidResponse(() => parseOpeningResponse({ ...opening, premise: '' }, 3));
   invalidResponse(() => parseOpeningResponse({ ...opening, roll: 42 }, 3));
@@ -74,7 +74,7 @@ test('check assessment accepts known classifications and rejects malformed ones'
 });
 
 test('checked narration must acknowledge the saved outcome', () => {
-  const response = { outcome: 'failure', narrative: 'The gate holds against you.', choices };
+  const response = { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'failure', narrative: 'The gate holds against you.', choices };
   assert.deepEqual(parseCheckedNarrationResponse(response, 3, 'failure'), response);
   invalidResponse(() => parseCheckedNarrationResponse({ ...response, outcome: 'success' }, 3, 'failure'));
   invalidResponse(() => parseCheckedNarrationResponse({ ...response, outcome: 'partial' }, 3, 'failure'));

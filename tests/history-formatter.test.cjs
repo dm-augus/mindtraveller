@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { formatHistory } = require('../dist/main/history-formatter.js');
 function fixture(language) {
-  return { language, theme: 'Horror', character: { name: 'João', gender: 'Man', nature: 'Good', allocationMethod: 'Simplified',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, language, theme: 'Horror', character: { name: 'João', gender: 'Man', nature: 'Good', allocationMethod: 'Simplified',
     attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } },
     premise: 'Uma maldição. An ancient curse.', segments: Array.from({ length: 30 }, (_, index) => ({
       chapterNumber: Math.floor(index / 10) + 1, narrative: `Passagem ${index}: ação e coração.\n\nThe bell rings.`,

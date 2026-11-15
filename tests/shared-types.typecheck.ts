@@ -39,6 +39,8 @@ const validAdventure: Adventure = {
     }
   },
   premise: 'A forgotten gate is opening.',
+  mainObjective: 'Discover why the gate is opening.',
+  storyState: { location: 'The gate', situation: 'The road reaches the gate.', currentFocus: null },
   segments: [{
     id: 'segment-1',
     chapterNumber: 1,

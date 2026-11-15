@@ -21,6 +21,7 @@ let openingRequests = 0;
 let failOpeningOnce = false;
 let checkedAssessments = 0;
 let simpleAssessments = 0;
+let openAiContinuations = 0;
 const narratedChecks = [];
 const openAiOperations = [];
 let failGlobalSummaryOnce = true;
@@ -40,7 +41,10 @@ globalThis.fetch = async (url, options) => {
   let content;
   if (prompt.operation === 'assessment') {
     assert.equal(prompt.choice.choiceId, 'wait');
-    content = { kind: 'no-check', narrative: 'Aveline waits while the village bell rings.', choices: [
+    openAiContinuations++;
+    assert.equal(typeof prompt.context, 'object');
+    assert.equal(prompt.context.mainObjective, 'Find the source of the village bell.');
+    content = { storyState: { location: 'Village', situation: `Bell ${openAiContinuations} rings while Aveline waits.`, currentFocus: 'Listen for the bell’s source.' }, kind: 'no-check', narrative: `Aveline hears bell ${openAiContinuations} while waiting in the village.`, choices: [
       { id: 'wait', text: 'Wait for the bell.' },
       { id: 'ask', text: 'Ask about the bell.' },
       { id: 'enter', text: 'Enter the crypt.' }
@@ -70,7 +74,7 @@ async function finish(code, error) {
 }
 
 function adventure() {
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'shell-fixture', theme: 'High Fantasy',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
@@ -96,6 +100,7 @@ function adventure() {
 }
 
 async function checkWindow(window, store) {
+  window.webContents.backgroundThrottling = false;
   const evaluate = async (fn, ...args) => {
     try { return await window.webContents.executeJavaScript(`(${fn.toString()})(...${JSON.stringify(args)})`); }
     catch (error) { throw new Error(`Renderer check failed: ${fn.toString()}`, { cause: error }); }
@@ -114,13 +119,16 @@ async function checkWindow(window, store) {
       && [...document.images].every((image) => image.complete && image.naturalWidth > 0));
   }
   async function capture(name) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
       await settle();
       try {
         await fs.writeFile(path.join(output, `${name}.png`), (await window.webContents.capturePage(undefined, { stayAwake: true })).toPNG());
         return;
       } catch (error) {
-        if (attempt === 2 || !String(error).includes('UnknownVizError')) throw error;
+        if (attempt === 5 || !String(error).includes('UnknownVizError')) {
+          throw new Error(`Screenshot failed: ${name}`, { cause: error });
+        }
+        window.webContents.invalidate();
       }
     }
   }
@@ -259,6 +267,8 @@ async function checkWindow(window, store) {
   await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'story'
     && document.querySelectorAll('[data-choice-id]').length === 3);
   const generated = await store.load();
+  assert.equal(generated.mainObjective, 'Find the source of the village bell.');
+  assert.equal(generated.storyState.location, 'Crypt entrance');
   assert.equal(openingRequests, 1);
   assert.equal(generated.theme, 'Horror');
   assert.equal(generated.language, 'pt-BR');
@@ -344,6 +354,9 @@ async function checkWindow(window, store) {
   await waitFor(() => document.querySelectorAll('[data-segment-id]').length === 2
     && document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const checked = await store.load();
+  assert.equal(checked.mainObjective, generated.mainObjective);
+  assert.equal(checked.storyState.location, 'Crypt entrance');
+  assert.notDeepEqual(checked.storyState, generated.storyState);
   assert.equal(checked.phase.kind, 'ready');
   assert.deepEqual(checked.segments.at(-1).check, pendingCheck);
   assert.equal(checked.segments[0].selectedChoiceId, 'enter');
@@ -373,6 +386,8 @@ async function checkWindow(window, store) {
   await waitFor(() => document.querySelectorAll('[data-segment-id]').length === 3
     && document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const simple = await store.load();
+  assert.equal(simple.mainObjective, generated.mainObjective);
+  assert.equal(simple.storyState.currentFocus, 'Investigate the village warning.');
   assert.equal(simple.phase.kind, 'ready');
   assert.equal(simple.segments.at(-1).check, null);
   assert.equal(simple.segments[1].selectedChoiceId, 'ask');
@@ -429,6 +444,8 @@ async function checkWindow(window, store) {
   await evaluate(() => document.querySelector('.retry-button').click());
   await waitFor(() => document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const summarized = await store.load();
+  assert.equal(summarized.mainObjective, generated.mainObjective);
+  assert.equal(summarized.storyState.location, 'Village');
   assert.equal(summarized.language, 'pt-BR');
   assert.equal(summarized.phase.kind, 'ready');
   assert.equal(summarized.segments.length, 10);
@@ -700,6 +717,7 @@ void (async () => {
     for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw);
     const prompt = JSON.parse(body.messages[1].content);
+    assert.deepEqual(body.options, { num_ctx: 8192, num_predict: 1536 });
     const choices = [
       { id: 'enter', text: 'Enter the crypt.' },
       { id: 'ask', text: 'Question the villagers.' },
@@ -711,7 +729,7 @@ void (async () => {
       assert.equal(prompt.theme, 'Horror');
       assert.equal(prompt.character.name, 'Aveline');
       openingRequests += 1;
-      content = { premise: 'A bell rings beneath the village.',
+      content = { mainObjective: 'Find the source of the village bell.', storyState: { location: 'Crypt entrance', situation: 'Aveline stands outside the crypt.', currentFocus: 'Investigate the crypt.' }, premise: 'A bell rings beneath the village.',
         narrative: 'Aveline approaches the crypt. The villagers wait behind her.', choices };
     } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'enter') {
       checkedAssessments += 1;
@@ -719,12 +737,12 @@ void (async () => {
     } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'ask') {
       simpleAssessments += 1;
       if (simpleAssessments === 1) { response.writeHead(503).end(); return; }
-      content = { kind: 'no-check', narrative: 'The villagers share a warning.',
+      content = { storyState: { location: 'Village', situation: 'The villagers have shared a warning.', currentFocus: 'Investigate the village warning.' }, kind: 'no-check', narrative: 'The villagers share a warning.',
         choices: choices.map((choice) => ({ ...choice, text: `${choice.text} Follow the villagers' warning.` })) };
     } else if (prompt.operation === 'checked-narration') {
       narratedChecks.push(prompt.check);
       if (narratedChecks.length === 1) { response.writeHead(503).end(); return; }
-      content = { outcome: prompt.check.outcome,
+      content = { storyState: { location: 'Crypt entrance', situation: prompt.check.outcome === 'success' ? 'The crypt door is open.' : 'The crypt door resisted the attempt.', currentFocus: 'Find the bell beyond the door.' }, outcome: prompt.check.outcome,
         narrative: prompt.check.outcome === 'success' ? 'Aveline opens the crypt door.' : 'The crypt door resists Aveline.',
         choices: choices.map((choice) => ({ ...choice, text: `${choice.text} After the crypt door attempt.` })) };
     } else {

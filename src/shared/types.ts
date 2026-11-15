@@ -57,6 +57,12 @@ export interface ChapterSummary {
   text: string;
 }
 
+export interface StoryState {
+  location: string | null;
+  situation: string;
+  currentFocus: string | null;
+}
+
 export interface PendingChoice {
   turnId: string;
   choiceId: string;
@@ -80,6 +86,8 @@ export interface Adventure {
   theme: Theme;
   character: Character;
   premise: string | null;
+  mainObjective: string | null;
+  storyState: StoryState | null;
   segments: StorySegment[];
   chapterSummaries: ChapterSummary[];
   globalSummary: string;

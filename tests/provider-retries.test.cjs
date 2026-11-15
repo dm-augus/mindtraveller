@@ -32,8 +32,8 @@ const operations = [
   {
     method: 'generateOpening', phase: 'pending-opening',
     request: { ...common, theme: 'Horror', character, rules: 'D100 rules' },
-    valid: { premise: 'The abbey bell rings.', narrative: 'The gate is locked.', choices },
-    invalid: { premise: 'The abbey bell rings.', narrative: secret, choices: [choices[0], choices[0], choices[2]] }
+    valid: { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'The abbey bell rings.', narrative: 'The gate is locked.', choices },
+    invalid: { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'The abbey bell rings.', narrative: secret, choices: [choices[0], choices[0], choices[2]] }
   },
   {
     method: 'assessAction', phase: 'pending-assessment',
@@ -44,14 +44,14 @@ const operations = [
   {
     method: 'assessAction', phase: 'pending-assessment',
     request: { ...common, context: 'The path is clear.', choice, attributes: character.attributes },
-    valid: { kind: 'no-check', narrative: 'Mira follows the path.', choices },
-    invalid: { kind: 'no-check', narrative: secret, choices: [] }
+    valid: { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'Mira follows the path.', choices },
+    invalid: { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: secret, choices: [] }
   },
   {
     method: 'narrateCheck', phase: 'pending-narration',
     request: { ...common, context: 'The gate is locked.', choice, check },
-    valid: { outcome: 'success', narrative: 'The gate gives way.', choices },
-    invalid: { outcome: 'failure', narrative: secret, choices }
+    valid: { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices },
+    invalid: { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'failure', narrative: secret, choices }
   },
   {
     method: 'summarize', phase: 'pending-summary',
@@ -145,7 +145,7 @@ async function temporaryUserData(t) {
 }
 
 function adventure() {
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror', character,
     premise: 'A bell sounds under the abbey.',
     segments: [{
@@ -228,7 +228,7 @@ for (const provider of ['ollama', 'openai']) {
         const completed = await restarted.commitTurn(request.choice.turnId, {
           id: 'segment-2', chapterNumber: 1, narrative: result.narrative, choices: result.choices,
           selectedChoiceId: null, check: request.check, createdAt: '2026-11-11T12:01:00.000Z'
-        });
+        }, result.storyState);
         assert.equal(completed.segments.length, 2);
         assert.deepEqual(completed.segments[1].check, request.check);
         assert.equal(completed.phase.kind, 'ready');

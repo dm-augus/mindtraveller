@@ -108,6 +108,8 @@ export class StorySummarizer {
       const first = staged.segments.findIndex((segment) => segment.id === source.unsummarized[0].id);
       const precedingSegment = staged.segments[first - 1];
       const context = JSON.stringify({
+        mainObjective: staged.mainObjective,
+        storyState: staged.storyState,
         language: staged.language,
         languageInstruction: storyLanguageInstruction(staged.language),
         rules: GAME_RULES_TEXT,

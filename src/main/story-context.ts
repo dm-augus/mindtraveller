@@ -87,6 +87,8 @@ export class StoryContextBuilder {
       return [summary.chapterNumber, boundary?.chapterNumber === summary.chapterNumber ? boundary.index : -1];
     }));
     const context = {
+      mainObjective: adventure.mainObjective,
+      storyState: adventure.storyState,
       language: adventure.language,
       languageInstruction: storyLanguageInstruction(adventure.language),
       rules: GAME_RULES_TEXT,
@@ -103,7 +105,7 @@ export class StoryContextBuilder {
       latestCheck: phase.kind === 'pending-narration' ? phase.check
         : phase.kind === 'pending-assessment' ? null : adventure.segments.at(-1)?.check ?? null
     };
-    // Rules, objectives in global memory, and recent or unsummarized detail take priority.
+    // Explicit objective/state, rules, and recent or unsummarized detail take priority.
     const requiredText = JSON.stringify(context);
     this.requireBudget(requiredText);
     let bytes = Buffer.byteLength(requiredText, 'utf8');
@@ -144,6 +146,7 @@ export class StoryContextBuilder {
     return {
       modelId,
       context: this.build(adventure),
+      recentNarratives: adventure.segments.slice(-6).map(segment => segment.narrative),
       language: adventure.language,
       choice: { ...adventure.phase.choice },
       attributes: { ...adventure.character.attributes },
@@ -159,6 +162,7 @@ export class StoryContextBuilder {
     return {
       modelId,
       context: this.build(adventure),
+      recentNarratives: adventure.segments.slice(-6).map(segment => segment.narrative),
       choice: { ...adventure.phase.choice },
       check: { ...adventure.phase.check },
       language: adventure.language,

@@ -81,7 +81,7 @@ void (async () => {
   const profile = await fs.mkdtemp(path.join(output, 'profile-'));
   const store = new AdventureStore(profile);
   // Seed only the isolated profile, then verify the installed app finds it on launch.
-  const fixture = {
+  const fixture = { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language, id: 'installed-fixture', theme: 'Horror',
     character: { name: `Installer Traveller-${path.basename(profile)}`, gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
       attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } },

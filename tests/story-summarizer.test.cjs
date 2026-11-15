@@ -39,7 +39,7 @@ function segment(number, chapterNumber = 1) {
 function adventure(count = 2) {
   const segments = Array.from({ length: count }, (_, index) => segment(index + 1));
   for (const event of segments.slice(0, -1)) event.selectedChoiceId = event.choices[0].id;
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',

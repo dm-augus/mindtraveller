@@ -1,4 +1,5 @@
 import { validateCheckSelection } from './action-rules';
+import { isStoryState } from './story-memory';
 import type {
   AttributeName,
   Attributes,
@@ -11,6 +12,7 @@ import type {
   PendingChoice,
   ProviderKind,
   StoryLanguage,
+  StoryState,
   Theme
 } from './types';
 
@@ -31,6 +33,8 @@ export interface OpeningRequest {
 
 export interface OpeningResponse {
   premise: string;
+  mainObjective: string;
+  storyState: StoryState;
   narrative: string;
   choices: Choice[];
 }
@@ -39,6 +43,8 @@ export interface ActionAssessmentRequest {
   language: StoryLanguage;
   modelId: string;
   context: string;
+  /** Local validation input; never duplicated in the provider's messages. */
+  recentNarratives?: readonly string[];
   choice: PendingChoice;
   attributes: Attributes;
   paragraphTarget: number;
@@ -46,13 +52,15 @@ export interface ActionAssessmentRequest {
 }
 
 export type ActionAssessmentResponse =
-  | { kind: 'no-check'; narrative: string; choices: Choice[] }
+  | { kind: 'no-check'; narrative: string; choices: Choice[]; storyState: StoryState }
   | { kind: 'check'; difficulty: DifficultyClass; attribute: AttributeName };
 
 export interface CheckedNarrationRequest {
   language: StoryLanguage;
   modelId: string;
   context: string;
+  /** Retain the six-scene validation window even with a smaller context selection. */
+  recentNarratives?: readonly string[];
   choice: PendingChoice;
   check: CheckRecord;
   paragraphTarget: number;
@@ -61,6 +69,7 @@ export interface CheckedNarrationRequest {
 
 export interface CheckedNarrationResponse {
   outcome: CheckOutcome;
+  storyState: StoryState;
   narrative: string;
   choices: Choice[];
 }
@@ -93,6 +102,13 @@ export class ProviderContractError extends Error {
   }
 }
 
+export class MalformedNarrativeError extends ProviderContractError {
+  constructor() {
+    super('Response field syntax leaked into the narrative.');
+    this.name = 'MalformedNarrativeError';
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -104,6 +120,27 @@ function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): 
 function nonEmptyText(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) throw new ProviderContractError('Expected non-empty text.');
   return value.trim();
+}
+
+function parseNarrative(value: unknown): string {
+  const narrative = nonEmptyText(value);
+  // Match response syntax, including incomplete fragments, rather than ordinary
+  // prose mentioning choices or a character's state.
+  if (/(?:^|[,\n{}])\s*["']?choices["']?\s*:\s*\[\s*(?:\{|$)/iu.test(narrative)
+    || /(?:^|[,\n{}])\s*["']?storyState["']?\s*:\s*\{/iu.test(narrative)
+    || /(?:^|[,\n{}])\s*"(?:narrative|mainObjective|outcome)"\s*:\s*"/iu.test(narrative)) {
+    throw new MalformedNarrativeError();
+  }
+  return narrative;
+}
+
+export function parseStoryState(value: unknown): StoryState {
+  if (!isStoryState(value)) throw new ProviderContractError('Malformed story state.');
+  return {
+    location: value.location === null ? null : value.location.trim(),
+    situation: value.situation.trim(),
+    currentFocus: value.currentFocus === null ? null : value.currentFocus.trim()
+  };
 }
 
 function assertChoiceTarget(target: number): void {
@@ -136,12 +173,14 @@ function parseChoices(value: unknown, expectedCount: number): Choice[] {
 }
 
 export function parseOpeningResponse(value: unknown, choiceTarget: number): OpeningResponse {
-  if (!isRecord(value) || !hasExactKeys(value, ['premise', 'narrative', 'choices'])) {
+  if (!isRecord(value) || !hasExactKeys(value, ['premise', 'narrative', 'choices', 'mainObjective', 'storyState'])) {
     throw new ProviderContractError('Malformed opening response.');
   }
   return {
     premise: nonEmptyText(value.premise),
-    narrative: nonEmptyText(value.narrative),
+    mainObjective: nonEmptyText(value.mainObjective),
+    storyState: parseStoryState(value.storyState),
+    narrative: parseNarrative(value.narrative),
     choices: parseChoices(value.choices, choiceTarget)
   };
 }
@@ -153,12 +192,13 @@ export function parseActionAssessmentResponse(
 ): ActionAssessmentResponse {
   if (!isRecord(value)) throw new ProviderContractError('Malformed action assessment.');
   if (value.kind === 'no-check') {
-    if (!hasExactKeys(value, ['kind', 'narrative', 'choices'])) {
+    if (!hasExactKeys(value, ['kind', 'narrative', 'choices', 'storyState'])) {
       throw new ProviderContractError('Malformed no-check assessment.');
     }
     return {
       kind: 'no-check',
-      narrative: nonEmptyText(value.narrative),
+      storyState: parseStoryState(value.storyState),
+      narrative: parseNarrative(value.narrative),
       choices: parseChoices(value.choices, choiceTarget)
     };
   }
@@ -181,7 +221,7 @@ export function parseCheckedNarrationResponse(
   choiceTarget: number,
   expectedOutcome: CheckOutcome
 ): CheckedNarrationResponse {
-  if (!isRecord(value) || !hasExactKeys(value, ['outcome', 'narrative', 'choices'])) {
+  if (!isRecord(value) || !hasExactKeys(value, ['outcome', 'narrative', 'choices', 'storyState'])) {
     throw new ProviderContractError('Malformed checked narration.');
   }
   if (value.outcome !== expectedOutcome || (value.outcome !== 'success' && value.outcome !== 'failure')) {
@@ -189,7 +229,8 @@ export function parseCheckedNarrationResponse(
   }
   return {
     outcome: value.outcome,
-    narrative: nonEmptyText(value.narrative),
+    storyState: parseStoryState(value.storyState),
+    narrative: parseNarrative(value.narrative),
     choices: parseChoices(value.choices, choiceTarget)
   };
 }
