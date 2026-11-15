@@ -62,7 +62,7 @@ test('explicit malformed objective/state is rejected and valid memory round-trip
     await assert.rejects(store.load(), /No valid adventure/);
   }
   await store.save(saved);
-  assert.deepEqual(await store.load(), saved);
+  assert.deepEqual(await store.load(), { ...saved, character: { ...saved.character, avatarId: null } });
   await assert.rejects(store.save({ ...saved, mainObjective: undefined }), /save schema/);
   await assert.rejects(store.save({ ...saved, storyState: undefined }), /save schema/);
 });

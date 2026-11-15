@@ -1,9 +1,9 @@
 import { validateCheckSelection } from './action-rules';
 import { isStoryState } from './story-memory';
+import type { NarrativeCharacter } from './narrative-character';
 import type {
   AttributeName,
   Attributes,
-  Character,
   CheckOutcome,
   CheckRecord,
   Choice,
@@ -25,7 +25,7 @@ export interface OpeningRequest {
   language: StoryLanguage;
   modelId: string;
   theme: Theme;
-  character: Character;
+  character: NarrativeCharacter;
   rules: string;
   paragraphTarget: number;
   choiceTarget: number;

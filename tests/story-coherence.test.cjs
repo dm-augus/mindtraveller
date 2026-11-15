@@ -24,7 +24,7 @@ function memoryFiles() {
 const choices = [{ id: 'enter', text: 'Entrar na casa de Thoric.' },
   { id: 'ask', text: 'Perguntar aos vizinhos.' }, { id: 'leave', text: 'Deixar a vila.' }];
 const setup = { language: 'pt-BR', theme: 'High Fantasy', character: {
-  name: 'Richter', gender: 'male', nature: 'Neutral', allocationMethod: 'Simplified',
+  name: 'Richter', gender: 'Male', avatarId: 'set_01_male_warrior', nature: 'Neutral', allocationMethod: 'Simplified',
   attributes: { Strength: 0, Dexterity: 3, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 }
 } };
 const initialState = { location: 'Casa de Thoric', situation: 'Richter está do lado de fora da janela.',

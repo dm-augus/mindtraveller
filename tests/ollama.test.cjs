@@ -10,7 +10,7 @@ const choices = [
   { id: 'leave', text: 'Leave the abbey.' }
 ];
 const character = {
-  name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+  name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
   attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
 };
 const pendingChoice = { turnId: 'turn-1', choiceId: 'inspect', choiceText: 'Inspect the gate.' };

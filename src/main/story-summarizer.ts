@@ -5,6 +5,7 @@ import {
   type SummaryResponse
 } from '../shared/provider-contract';
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
+import { narrativeCharacter } from '../shared/narrative-character';
 import { storyLanguageInstruction } from '../shared/story-language';
 import type { Adventure, ChapterSummary, StorySegment } from '../shared/types';
 import { createStoryConfiguration, type StoryConfiguration } from './story-config';
@@ -114,7 +115,7 @@ export class StorySummarizer {
         languageInstruction: storyLanguageInstruction(staged.language),
         rules: GAME_RULES_TEXT,
         theme: staged.theme,
-        character: staged.character,
+        character: narrativeCharacter(staged.character),
         premise: staged.premise,
         globalSummary: staged.globalSummary,
         previousChapterSummary: source.previousSummary?.text ?? '',

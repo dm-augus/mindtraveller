@@ -26,7 +26,7 @@ function adventure() {
     theme: 'Horror',
     character: {
       name: 'Mira',
-      gender: 'Woman',
+      gender: 'Woman', avatarId: null,
       nature: 'Good',
       allocationMethod: 'Balanced',
       attributes: {

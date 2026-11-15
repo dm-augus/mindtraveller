@@ -83,7 +83,7 @@ void (async () => {
   // Seed only the isolated profile, then verify the installed app finds it on launch.
   const fixture = { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language, id: 'installed-fixture', theme: 'Horror',
-    character: { name: `Installer Traveller-${path.basename(profile)}`, gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+    character: { name: `Installer Traveller-${path.basename(profile)}`, gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Simplified',
       attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } },
     premise: 'An offline restoration check.', segments: [{ id: 'installed-opening', chapterNumber: 1,
       narrative: language === 'pt-BR' ? 'Jo?o retorna ? aldeia: a??o e cora??o.' : 'The installed traveller returns to the village.', choices: [

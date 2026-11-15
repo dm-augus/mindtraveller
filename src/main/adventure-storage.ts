@@ -6,6 +6,7 @@ import { isAdventure } from '../shared/adventure-validation';
 import type { Adventure } from '../shared/types';
 import { isStoryLanguage } from '../shared/story-language';
 import { isStoryState, normalizeStoryMemory } from '../shared/story-memory';
+import { isAvatarId, normalizeSavedAvatar } from '../shared/avatars';
 
 export interface AdventureFileOps {
   mkdir(filePath: string, options: { recursive: true }): Promise<string | undefined>;
@@ -33,6 +34,7 @@ function parseDocument(text: string): Adventure | null {
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       normalizeStoryMemory(value as Record<string, unknown>);
+      normalizeSavedAvatar(value as Record<string, unknown>);
     }
     return isAdventure(value) ? value : null;
   } catch {
@@ -55,6 +57,10 @@ function isDiscardMarker(text: string): boolean {
 }
 
 function serializeAdventure(adventure: Adventure): string {
+  if (adventure.character && 'avatarId' in adventure.character && adventure.character.avatarId !== null
+    && !isAvatarId(adventure.character.avatarId)) {
+    throw new TypeError('Adventure does not match save schema version 1.');
+  }
   if (('mainObjective' in adventure && adventure.mainObjective !== null
       && (typeof adventure.mainObjective !== 'string' || !adventure.mainObjective.trim()))
     || ('storyState' in adventure && adventure.storyState !== null && !isStoryState(adventure.storyState))) {

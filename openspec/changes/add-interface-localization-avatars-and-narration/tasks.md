@@ -8,9 +8,9 @@
 
 ## 2. Character gender and portraits
 
-- [ ] 2.1 Add the twelve-entry avatar catalog, canonical new-character gender validation, and nullable saved avatar IDs; separate legacy-save identity validation from creation rules and verify unknown/path/mismatched avatar rejection, arbitrary legacy gender preservation, active/backup reads, compare-and-save, and all pending phases without changed history or rolls.
-- [ ] 2.2 Replace gender text entry with localized radio buttons, add the matching six-portrait picker and role-preserving gender changes, and show the selected portrait/name in the sidebar; document legacy fallback and cosmetic-only roles and verify keyboard use, default warrior selection, long names, failed-image fallback, restart/navigation/retry persistence, and bundled asset loading.
-- [ ] 2.3 Add secondary gender guidance to shared LLM prompts and project cosmetic avatar fields out of narrative character context; verify both adapters carry canonical gender for opening/continuation and retries without changing odds or sending avatar filenames, and record a focused live-model review of gender-aware wording separately from automated payload checks.
+- [x] 2.1 Add the twelve-entry avatar catalog, canonical new-character gender validation, and nullable saved avatar IDs; separate legacy-save identity validation from creation rules and verify unknown/path/mismatched avatar rejection, arbitrary legacy gender preservation, active/backup reads, compare-and-save, and all pending phases without changed history or rolls.
+- [x] 2.2 Replace gender text entry with localized radio buttons, add the matching six-portrait picker and role-preserving gender changes, and show the selected portrait/name in the sidebar; document legacy fallback and cosmetic-only roles and verify keyboard use, default warrior selection, long names, failed-image fallback, restart/navigation/retry persistence, and bundled asset loading.
+- [x] 2.3 Add secondary gender guidance to shared LLM prompts and project cosmetic avatar fields out of narrative character context; verify both adapters carry canonical gender for opening/continuation and retries without changing odds or sending avatar filenames, and record a focused live-model review of gender-aware wording separately from automated payload checks.
 
 ## 3. Local Windows speech
 

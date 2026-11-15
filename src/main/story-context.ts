@@ -4,6 +4,7 @@ import type {
   OpeningRequest
 } from '../shared/provider-contract';
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
+import { narrativeCharacter } from '../shared/narrative-character';
 import { storyLanguageInstruction } from '../shared/story-language';
 import type { Adventure, Choice, StorySegment } from '../shared/types';
 import { createStoryConfiguration, type StoryConfiguration } from './story-config';
@@ -93,7 +94,7 @@ export class StoryContextBuilder {
       languageInstruction: storyLanguageInstruction(adventure.language),
       rules: GAME_RULES_TEXT,
       theme: adventure.theme,
-      character: adventure.character,
+      character: narrativeCharacter(adventure.character),
       premise: adventure.premise,
       globalSummary: adventure.globalSummary,
       chapterSummaries: adventure.chapterSummaries.filter((summary) => requiredChapters.has(summary.chapterNumber)),
@@ -130,7 +131,7 @@ export class StoryContextBuilder {
       modelId,
       language: setup.language,
       theme: setup.theme,
-      character: structuredClone(setup.character),
+      character: narrativeCharacter(setup.character),
       rules: GAME_RULES_TEXT,
       paragraphTarget: this.configuration.paragraphTarget,
       choiceTarget: this.configuration.choiceTarget

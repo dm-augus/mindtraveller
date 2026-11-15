@@ -4,10 +4,12 @@ const path = require('node:path');
 const { AdventureStore } = require('../dist/main/adventure-storage.js');
 const { validateCharacterSetup } = require('../dist/shared/character-rules.js');
 const { normalizeStoryMemory } = require('../dist/shared/story-memory.js');
+const { normalizeSavedAvatar } = require('../dist/shared/avatars.js');
 
 function withMemory(adventure) {
   const normalized = structuredClone(adventure);
   normalizeStoryMemory(normalized);
+  normalizeSavedAvatar(normalized);
   return normalized;
 }
 
@@ -53,7 +55,8 @@ for (const phase of [{ kind: 'ready' }, { kind: 'pending-opening', turnId: 'turn
 test('explicit language validation and Portuguese round-trip', async () => {
   const files = memoryFiles(), store = new AdventureStore(path.resolve('out/language-test'), files);
   const adventure = { ...legacy({ kind: 'ready' }), language: 'pt-BR' };
-  assert.equal(validateCharacterSetup(adventure).value.language, 'pt-BR');
+  assert.equal(validateCharacterSetup({ ...adventure, character: { ...adventure.character,
+    gender: 'Female', avatarId: 'set_01_female_warrior' } }).value.language, 'pt-BR');
   for (const language of ['pt', 'fr', null, undefined]) {
     assert.equal(validateCharacterSetup({ ...adventure, language }).valid, false);
     await assert.rejects(store.save({ ...adventure, language }));

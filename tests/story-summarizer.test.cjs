@@ -1,3 +1,4 @@
+const narrative = ({ avatarId, ...identity }) => identity;
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -42,7 +43,7 @@ function adventure(count = 2) {
   return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     },
     premise: 'A bell rings beneath the abbey.', segments, chapterSummaries: [],
@@ -114,7 +115,7 @@ test('summary requests carry full source decisions and checks, prior memory, rul
   const chapter = JSON.parse(stub.requests[0].context);
   assert.equal(chapter.rules, GAME_RULES_TEXT);
   assert.equal(chapter.theme, saved.theme);
-  assert.deepEqual(chapter.character, saved.character);
+  assert.deepEqual(chapter.character, narrative(saved.character));
   assert.equal(chapter.premise, saved.premise);
   assert.equal(chapter.globalSummary, saved.globalSummary);
   assert.equal(chapter.previousChapterSummary, '');

@@ -20,7 +20,7 @@ function adventure() {
   return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Female', avatarId: 'set_01_female_warrior', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     },
     premise: 'A bell sounds beneath the abbey.',

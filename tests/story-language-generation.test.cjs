@@ -11,7 +11,7 @@ const { StoryPreferencesStore } = require('../dist/main/story-preferences.js');
 const { StoryController } = require('../dist/main/story-controller.js');
 
 const choices = [{ id: 'enter', text: 'Entrar.' }, { id: 'wait', text: 'Esperar.' }, { id: 'ask', text: 'Perguntar.' }];
-const character = { name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+const character = { name: 'Mira', gender: 'Female', avatarId: 'set_01_female_warrior', nature: 'Good', allocationMethod: 'Simplified',
   attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 } };
 const choice = { turnId: 'turn', choiceId: 'enter', choiceText: 'Entrar.' };
 const check = { difficulty: 'Hard', attribute: 'Strength', attributeValue: 3, baseThreshold: 20, threshold: 50, roll: 30, outcome: 'success' };
@@ -21,13 +21,20 @@ function adventure(language) {
     segments: [{ id: 'scene', chapterNumber: 1, narrative: 'Um portão.', choices, selectedChoiceId: null, check: null, createdAt: '2026-11-14' }],
     chapterSummaries: [], globalSummary: '', phase: { kind: 'ready' }, updatedAt: '2026-11-14' };
 }
-for (const language of ['en', 'pt-BR']) for (const kind of ['ollama', 'openai']) {
-  test(`${kind} sends ${language} for every prose operation without translating contracts`, async () => {
+for (const language of ['en', 'pt-BR']) for (const kind of ['ollama', 'openai']) for (const gender of ['Male', 'Female']) {
+  test(`${kind} sends ${language} and ${gender} for every prose operation without cosmetics`, async () => {
+    const identity = { ...character, gender, avatarId: `set_01_${gender.toLowerCase()}_mage` };
     const seen = [];
     let checkedAssessment = false;
     const fetchImpl = async (_url, options) => {
       const body = JSON.parse(options.body), messages = body.input ?? body.messages;
       const prompt = JSON.parse(messages[1].content);
+      const sentCharacter = prompt.operation === 'opening' ? prompt.character : prompt.context.character;
+      assert.equal(sentCharacter.gender, gender);
+      assert.deepEqual(sentCharacter.attributes, character.attributes);
+      assert.equal(Object.hasOwn(sentCharacter, 'avatarId'), false);
+      assert.doesNotMatch(JSON.stringify(messages), /avatarId|set_01_|\.png/);
+      if (prompt.operation !== 'summary') assert.match(messages[0].content, /gender as secondary narrative context/);
       seen.push(prompt.operation === 'summary' ? prompt.kind : prompt.operation);
       assert.equal(prompt.language, language);
       assert.match(messages[0].content, language === 'en' ? /in English/ : /in Brazilian Portuguese/);
@@ -45,8 +52,8 @@ for (const language of ['en', 'pt-BR']) for (const kind of ['ollama', 'openai'])
     };
     const provider = kind === 'ollama' ? new OllamaAdapter('http://127.0.0.1:11434', { fetchImpl })
       : new OpenAiAdapter({ getOpenAiKeyForRequest: async () => 'fixture-key' }, { fetchImpl });
-    const base = { modelId: 'fixture', language, context: '{}', paragraphTarget: 3, choiceTarget: 3 };
-    const opening = await provider.generateOpening({ ...base, theme: 'Horror', character, rules: 'D100' });
+    const base = { modelId: 'fixture', language, context: JSON.stringify({ character: identity }), paragraphTarget: 3, choiceTarget: 3 };
+    const opening = await provider.generateOpening({ ...base, theme: 'Horror', character: identity, rules: 'D100' });
     assert.deepEqual(opening.choices, choices);
     assert.equal((await provider.assessAction({ ...base, choice, attributes: character.attributes })).kind, 'no-check');
     checkedAssessment = true;
@@ -93,8 +100,9 @@ function memoryFiles() {
     rename: async (from, to) => { documents.set(to, documents.get(from)); documents.delete(from); },
     unlink: async (file) => { documents.delete(file); } };
 }
-for (const language of ['en', 'pt-BR']) for (const failure of ['opening', 'assessment', 'narration', 'chapter', 'global']) {
-  test(`${language} ${failure} recovery keeps saved language and decisions after defaults and provider change`, async () => {
+for (const language of ['en', 'pt-BR']) for (const failure of ['opening', 'assessment', 'narration', 'chapter', 'global']) for (const gender of ['Male', 'Female']) {
+  test(`${language} ${gender} ${failure} recovery keeps identity and decisions after defaults and provider change`, async () => {
+    const identity = { ...character, gender, avatarId: `set_01_${gender.toLowerCase()}_cleric` };
     const files = memoryFiles(), base = path.resolve('out/language-recovery');
     const store = new AdventureStore(base, files), preferences = new StoryPreferencesStore(base, files);
     await preferences.save({ defaultStoryLanguage: language });
@@ -104,6 +112,10 @@ for (const language of ['en', 'pt-BR']) for (const failure of ['opening', 'asses
       function receive(operation, request, output) {
         requests.push({ kind, operation, request: structuredClone(request) });
         assert.equal(request.language, language);
+        const sentCharacter = operation === 'opening' ? request.character : JSON.parse(request.context).character;
+        assert.equal(sentCharacter.gender, gender);
+        assert.equal(Object.hasOwn(sentCharacter, 'avatarId'), false);
+        assert.doesNotMatch(JSON.stringify(request), /avatarId|set_01_|\.png/);
         if (failing && operation === failure) throw new Error('Simulated interruption');
         return output;
       }
@@ -120,9 +132,9 @@ for (const language of ['en', 'pt-BR']) for (const failure of ['opening', 'asses
     const source = async () => selection;
     const controller = new StoryController(store, source, { chapterLength: 2 });
     if (failure === 'opening') {
-      await assert.rejects(controller.startOpening({ language, theme: 'Horror', character }), /Simulated/);
+      await assert.rejects(controller.startOpening({ language, theme: 'Horror', character: identity }), /Simulated/);
     } else {
-      await store.save(adventure(language));
+      await store.save({ ...adventure(language), character: identity });
       await assert.rejects(controller.submitChoice('scene', 'enter'), /Simulated/);
     }
     const pending = await store.load(), priorSegments = structuredClone(pending.segments);
@@ -139,6 +151,7 @@ for (const language of ['en', 'pt-BR']) for (const failure of ['opening', 'asses
     const completed = failure === 'opening' ? await restarted.retryOpening()
       : (await restarted.retryTurn('choice' in pending.phase ? pending.phase.choice.turnId : pending.phase.turnId)).adventure;
     assert.equal(completed.language, language);
+    assert.deepEqual(completed.character, identity);
     assert.equal(completed.phase.kind, 'ready');
     assert.equal(completed.segments.length, failure === 'opening' ? 1 : 2);
     assert.equal(new Set(completed.segments.map((segment) => segment.id)).size, completed.segments.length);

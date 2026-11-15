@@ -1,5 +1,13 @@
 /** Application text only. Keep keys stable; placeholders are named parameters. */
 export const en = {
+  'label.Male': 'Male', 'label.Female': 'Female', 'avatar.title': 'Choose your portrait',
+  'avatar.chooseGender': 'Select a gender to see the available portraits.',
+  'avatar.help': 'Choose a portrait. Appearance does not assign a class or change your attributes.',
+  'avatar.option': '{gender} — {role}', 'avatar.description': 'Portrait of {name}: {role}',
+  'avatar.role.warrior': 'Warrior', 'avatar.role.rogue': 'Rogue', 'avatar.role.ranger': 'Ranger',
+  'avatar.role.mage': 'Mage', 'avatar.role.cleric': 'Cleric', 'avatar.role.berserker': 'Berserker',
+  'validation.genderSelection': 'Select Male or Female.', 'validation.avatar': 'Select a valid character portrait.',
+  'validation.avatarGender': 'Select a portrait matching the character gender.',
   'nav.newStory': 'New Story', 'nav.rules': 'Rules', 'nav.settings': 'Settings', 'nav.quit': 'Quit',
   'nav.main': 'Main navigation', 'nav.return': 'Return to story', 'nav.returnLong': 'Return to your story',
   'view.story': 'Your adventure', 'view.newStory': 'A new story', 'view.rules': 'Rules of the journey', 'view.settings': 'Storyteller settings',

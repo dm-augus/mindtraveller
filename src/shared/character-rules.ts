@@ -2,6 +2,7 @@ import { ALLOCATION_BUDGETS, ATTRIBUTE_NAMES, ATTRIBUTE_RANGES } from './rules';
 import type { AllocationMethod, Attributes, Character, Nature, Theme, StoryLanguage } from './types';
 import { isStoryLanguage } from './story-language';
 import { formatMessage, type MessageRef } from './i18n';
+import { AVATARS, isAvatarId, isCharacterGender } from './avatars';
 
 export { ATTRIBUTE_NAMES, ATTRIBUTE_RANGES } from './rules';
 
@@ -73,7 +74,7 @@ export function validateAttributeAllocation(method: unknown, input: unknown): Va
   return { valid: true, value: attributes };
 }
 
-export function validateCharacterSetup(input: unknown): ValidationResult<CharacterSetup> {
+function validateSetup(input: unknown, creating: boolean): ValidationResult<CharacterSetup> {
   if (!isRecord(input)) return invalid([{ key: 'validation.setup' }]);
   const issues: MessageRef[] = [];
   if (!isOneOf(input.theme, THEMES)) issues.push({ key: 'validation.theme' });
@@ -86,6 +87,13 @@ export function validateCharacterSetup(input: unknown): ValidationResult<Charact
   const gender = typeof character.gender === 'string' ? character.gender.trim() : '';
   if (!name) issues.push({ key: 'validation.name' });
   if (!gender) issues.push({ key: 'validation.gender' });
+  if (creating && !isCharacterGender(gender)) issues.push({ key: 'validation.genderSelection' });
+  const avatarId = !creating && !Object.hasOwn(character, 'avatarId') ? null : character.avatarId;
+  if (creating ? !isAvatarId(avatarId) : avatarId !== null && !isAvatarId(avatarId)) {
+    issues.push({ key: 'validation.avatar' });
+  } else if (creating && !AVATARS.some(avatar => avatar.id === avatarId && avatar.gender === gender)) {
+    issues.push({ key: 'validation.avatarGender' });
+  }
   if (!isOneOf(character.nature, NATURES)) issues.push({ key: 'validation.nature' });
 
   const allocation = validateAttributeAllocation(character.allocationMethod, character.attributes);
@@ -100,10 +108,21 @@ export function validateCharacterSetup(input: unknown): ValidationResult<Charact
       character: {
         name,
         gender,
+        avatarId: avatarId as Character['avatarId'],
         nature: character.nature as Nature,
         allocationMethod: character.allocationMethod as AllocationMethod,
         attributes: allocation.value
       }
     }
   };
+}
+
+export function validateCharacterSetup(input: unknown): ValidationResult<CharacterSetup> {
+  return validateSetup(input, true);
+}
+
+/** Saved identities retain legacy free-text gender; creation rules are stricter. */
+export function validateSavedCharacter(character: unknown): ValidationResult<Character> {
+  const result = validateSetup({ theme: 'Horror', character }, false);
+  return result.valid ? { valid: true, value: result.value.character } : result;
 }

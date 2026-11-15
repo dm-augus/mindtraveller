@@ -1,3 +1,4 @@
+const narrative = ({ avatarId, ...identity }) => identity;
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { GAME_RULES_TEXT } = require('../dist/shared/rules-reference.js');
@@ -14,7 +15,7 @@ function adventure() {
   return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     },
     premise: 'A bell sounds beneath the abbey.',
@@ -77,7 +78,7 @@ test('context contains shared rules, full character, theme, premise, memory, dec
   const context = JSON.parse(new StoryContextBuilder().build(saved));
   assert.equal(context.rules, GAME_RULES_TEXT);
   assert.equal(context.theme, saved.theme);
-  assert.deepEqual(context.character, saved.character);
+  assert.deepEqual(context.character, narrative(saved.character));
   assert.equal(context.character.nature, 'Good');
   assert.equal(context.premise, saved.premise);
   assert.equal(context.globalSummary, saved.globalSummary);
@@ -156,7 +157,7 @@ test('opening requests use shared rules and configured targets with no existing 
   const request = builder.openingRequest('story-model', saved);
   assert.deepEqual(request, {
     language: 'en',
-    modelId: 'story-model', theme: saved.theme, character: saved.character,
+    modelId: 'story-model', theme: saved.theme, character: narrative(saved.character),
     rules: GAME_RULES_TEXT, paragraphTarget: 2, choiceTarget: 4
   });
   request.character.attributes.Luck = 1;

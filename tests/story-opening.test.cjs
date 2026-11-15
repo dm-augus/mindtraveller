@@ -1,3 +1,4 @@
+const narrative = ({ avatarId, ...identity }) => identity;
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -17,7 +18,7 @@ function setup(theme = 'Horror') {
   return {
     theme,
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Female', avatarId: 'set_01_female_warrior', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     }
   };
@@ -84,7 +85,7 @@ for (const theme of ['Horror', 'Romance', 'High Fantasy']) {
       assert.equal(pending.premise, null);
       assert.deepEqual(pending.segments, []);
       assert.equal(request.theme, theme);
-      assert.deepEqual(request.character, input.character);
+      assert.deepEqual(request.character, narrative(input.character));
       assert.equal(request.rules, GAME_RULES_TEXT);
       assert.equal(request.modelId, 'selected-model');
       assert.equal(request.paragraphTarget, 2);
@@ -192,7 +193,7 @@ for (const failure of ['timeout', 'malformed']) {
     assert.equal(completed.segments[0].id, pending.phase.turnId);
     assert.equal(completed.segments.length, 1);
     assert.equal(recovered.requests[0].modelId, 'new-model');
-    assert.deepEqual(recovered.requests[0].character, setup().character);
+    assert.deepEqual(recovered.requests[0].character, narrative(setup().character));
     assert.equal((await restarted.restore()).phase.kind, 'ready');
   });
 }

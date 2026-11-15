@@ -10,7 +10,7 @@ import type {
 import type { Character, Choice, CheckRecord, PendingChoice } from '../src/shared/types';
 
 const character: Character = {
-  name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+  name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
   attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
 };
 const choice: PendingChoice = { turnId: 'turn-1', choiceId: 'gate', choiceText: 'Open the gate.' };

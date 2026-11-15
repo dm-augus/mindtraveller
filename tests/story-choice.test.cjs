@@ -1,3 +1,4 @@
+const narrative = ({ avatarId, ...identity }) => identity;
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
@@ -23,7 +24,7 @@ function adventure() {
   return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Female', avatarId: 'set_01_female_warrior', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     },
     premise: 'A bell sounds beneath the abbey.',
@@ -91,7 +92,7 @@ test('choice is durably selected before assessment; a no-check scene and choices
     assert.equal(request.choiceTarget, 3);
     const context = JSON.parse(request.context);
     assert.equal(context.rules, GAME_RULES_TEXT);
-    assert.deepEqual(context.character, before.character);
+    assert.deepEqual(context.character, narrative(before.character));
     assert.equal(context.globalSummary, before.globalSummary);
     assert.deepEqual(context.latestDecision, choices[0]);
     return continuation(request);

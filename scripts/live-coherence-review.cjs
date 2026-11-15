@@ -37,7 +37,7 @@ void (async () => {
     };
     try {
       let adventure = await controller.startOpening({ language, theme: 'High Fantasy', character: {
-        name: 'Richter', gender: 'male', nature: 'Neutral', allocationMethod: 'Simplified',
+        name: 'Richter', gender: 'Male', avatarId: 'set_01_male_warrior', nature: 'Neutral', allocationMethod: 'Simplified',
         attributes: { Strength: 0, Dexterity: 3, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 }
       } });
       await capture(adventure);

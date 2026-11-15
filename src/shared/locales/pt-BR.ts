@@ -1,6 +1,14 @@
 import type { en } from './en';
 
 export const ptBR: Record<keyof typeof en, string> = {
+  'label.Male': 'Masculino', 'label.Female': 'Feminino', 'avatar.title': 'Escolha seu retrato',
+  'avatar.chooseGender': 'Selecione um gênero para ver os retratos disponíveis.',
+  'avatar.help': 'Escolha um retrato. A aparência não define uma classe nem altera seus atributos.',
+  'avatar.option': '{gender} — {role}', 'avatar.description': 'Retrato de {name}: {role}',
+  'avatar.role.warrior': 'Guerreiro', 'avatar.role.rogue': 'Ladino', 'avatar.role.ranger': 'Patrulheiro',
+  'avatar.role.mage': 'Mago', 'avatar.role.cleric': 'Clérigo', 'avatar.role.berserker': 'Berserker',
+  'validation.genderSelection': 'Selecione Masculino ou Feminino.', 'validation.avatar': 'Selecione um retrato válido para o personagem.',
+  'validation.avatarGender': 'Selecione um retrato correspondente ao gênero do personagem.',
   'nav.newStory': 'Nova história', 'nav.rules': 'Regras', 'nav.settings': 'Configurações', 'nav.quit': 'Sair',
   'nav.main': 'Navegação principal', 'nav.return': 'Voltar à história', 'nav.returnLong': 'Voltar à sua história',
   'view.story': 'Sua aventura', 'view.newStory': 'Uma nova história', 'view.rules': 'Regras da jornada', 'view.settings': 'Configurações do narrador',

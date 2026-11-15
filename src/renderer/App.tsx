@@ -6,7 +6,7 @@ import type { CharacterSetup } from '../shared/character-rules';
 import { NewStorySetup } from './NewStorySetup';
 import { RulesView } from './RulesView';
 import { SettingsView } from './SettingsView';
-import diceArtwork from '../assets/branding/dice_artwork.png';
+import { CharacterPortrait } from './CharacterPortrait';
 import newStoryIcon from '../assets/icons/new_story_transparent.png';
 import rulesIcon from '../assets/icons/rules_transparent.png';
 import settingsIcon from '../assets/icons/settings_transparent.png';
@@ -235,7 +235,7 @@ export function App(): React.JSX.Element {
       <div className="workspace">
         <aside className="sidebar">
           <h1 className="sidebar-brand">Mindtraveller</h1>
-          <div className="branding-frame"><img className="dice-artwork" src={diceArtwork} alt={t('story.diceAlt')} /></div>
+          <CharacterPortrait key={`${adventure?.id ?? ''}:${adventure?.character.avatarId ?? ''}`} character={adventure?.character ?? null} />
           <nav className="main-navigation" aria-label={t('nav.main')}>{NAVIGATION.map((item) => (
             <button key={item.view} className={`retro-button nav-button${view === item.view ? ' is-selected' : ''}`}
               aria-current={view === item.view ? 'page' : undefined} data-view={item.view}
@@ -246,7 +246,7 @@ export function App(): React.JSX.Element {
           ))}</nav>
           <hr className="sidebar-divider" />
           <button className="retro-button nav-button quit-button" data-action="quit" onClick={() => { void quit(); }}><img src={quitIcon} alt="" /><span>{t('nav.quit')}</span></button>
-          <div className="sidebar-footer"><span className="eyebrow">{t('story.traveller')}</span><strong>{adventure?.character.name ?? t('story.unwritten')}</strong>
+          <div className="sidebar-footer"><span className="eyebrow">{t('story.traveller')}</span>{!adventure && <strong>{t('story.unwritten')}</strong>}
             {adventure && <span>{t('story.nature', { nature: adventure.character.nature })}</span>}</div>
         </aside>
         <div className="adventure-body">

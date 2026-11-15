@@ -77,7 +77,7 @@ function adventure() {
   return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'shell-fixture', theme: 'High Fantasy',
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     },
     premise: 'A silver bell rings in a ruined abbey. Someone inside remembers your name.',
@@ -146,8 +146,9 @@ async function checkWindow(window, store) {
     assert.equal(await evaluate(() => document.querySelector('[data-view="new-story"]').disabled), true);
     assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:not(:disabled)').length), 0);
     await assert.rejects(evaluate(() => window.mindtraveller.requestNewStory()));
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.ok(release);
+    const dialogDeadline = Date.now() + 5000;
+    while (!release && Date.now() < dialogDeadline) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.ok(release, 'The export dialog must open after the queued save read completes.');
     release({ canceled: false, filePath: destination });
     await waitFor(() => Boolean(document.querySelector('.export-feedback')));
     const text = await fs.readFile(destination, 'utf8');
@@ -169,7 +170,7 @@ async function checkWindow(window, store) {
       return {
         width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth,
         sidebar: rect('.sidebar'), story: rect('.story-panel'), decisions: rect('.decision-panel'), status: rect('.statusbar'),
-        quit: rect('[data-action="quit"]'), version: document.querySelector('.version').textContent,
+        quit: rect('[data-action="quit"]'), footer: rect('.sidebar-footer'), version: document.querySelector('.version').textContent,
         images: [...document.images].every((image) => image.complete && image.naturalWidth > 0)
       };
     });
@@ -179,6 +180,7 @@ async function checkWindow(window, store) {
     assert.ok(metrics.decisions.top >= metrics.story.bottom);
     assert.ok(metrics.decisions.bottom <= metrics.status.top);
     assert.ok(metrics.quit.bottom <= metrics.sidebar.bottom);
+    assert.ok(metrics.footer.bottom <= metrics.sidebar.bottom, 'Character information stays inside the sidebar.');
     assert.ok(metrics.status.bottom <= metrics.height);
     assert.ok(metrics.version.includes(app.getVersion()));
     assert.equal(metrics.images, true);
@@ -204,6 +206,60 @@ async function checkWindow(window, store) {
   await layout();
   await capture('shell-empty-760');
 
+  // Every content screen uses the available width, including large monitors.
+  for (const locale of ['en', 'pt-BR']) {
+    await evaluate(interfaceLanguage => window.mindtraveller.saveStoryPreferences({ interfaceLanguage }), locale);
+    const languageReload = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
+    window.webContents.reload(); await languageReload; await ready();
+    for (const [width, height] of [[760, 520], [1200, 800], [1920, 1080]]) {
+      window.setSize(width, height); await settle();
+      for (const [view, selector] of [['settings', '.settings-content'], ['rules', '.rules-content'], ['new-story', '.new-story-setup']]) {
+        await evaluate(name => document.querySelector(`[data-view="${name}"]`).click(), view);
+        await waitFor(name => document.querySelector('.app-shell').dataset.currentView === name, view);
+        await settle();
+        const metrics = await evaluate(selector => {
+          const content = document.querySelector(selector), panel = document.querySelector('.story-scroll');
+          const bounds = content.getBoundingClientRect(), style = getComputedStyle(panel);
+          const available = panel.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+          return { width: bounds.width, available, overflow: panel.scrollWidth > panel.clientWidth };
+        }, selector);
+        assert.ok(Math.abs(metrics.width - metrics.available) < 2, `${view} must fill the content width: ${JSON.stringify(metrics)}`);
+        assert.equal(metrics.overflow, false);
+        if (view === 'settings') {
+          assert.equal(await evaluate(() => {
+            const preferences = document.querySelector('.settings-preferences').getBoundingClientRect();
+            const provider = document.querySelector('.settings-provider').getBoundingClientRect();
+            return document.querySelector('.settings-content').clientWidth >= 900
+              ? provider.left > preferences.right && Math.abs(provider.top - preferences.top) < 2
+              : provider.top >= preferences.bottom;
+          }), true, 'Settings columns follow available content width.');
+          await evaluate(() => document.querySelector('.settings-content button[type="submit"]').scrollIntoView({ block: 'nearest' }));
+          await settle();
+          const saveBounds = await evaluate(() => {
+            const save = document.querySelector('.settings-content button[type="submit"]').getBoundingClientRect();
+            const panel = document.querySelector('.story-scroll').getBoundingClientRect();
+            return { top: save.top, bottom: save.bottom, panelTop: panel.top, panelBottom: panel.bottom };
+          });
+          assert.ok(saveBounds.top >= saveBounds.panelTop - 1 && saveBounds.bottom <= saveBounds.panelBottom + 1,
+            `Save remains reachable by scrolling: ${JSON.stringify(saveBounds)}`);
+          await evaluate(() => { document.querySelector('.story-scroll').scrollTop = 0; });
+        }
+        if (view === 'new-story') {
+          await evaluate(() => document.querySelector('input[name="gender"][value="Male"]').click());
+          await waitFor(() => [...document.querySelectorAll('.avatar-picker img')].every(img => img.complete && img.naturalWidth > 0));
+          assert.equal(await evaluate(() => document.querySelectorAll('.avatar-option strong').length), 0);
+          assert.equal(await evaluate(() => [...document.querySelectorAll('input[name="avatar"]')].every(input => Boolean(input.getAttribute('aria-label')))), true);
+          await evaluate(() => document.querySelector('.avatar-picker').scrollIntoView({ block: 'nearest' }));
+        }
+        await capture(`full-width-${view}-${locale}-${width}`);
+      }
+    }
+  }
+  await evaluate(() => window.mindtraveller.saveStoryPreferences({ interfaceLanguage: 'en' }));
+  const widthReviewReload = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload(); await widthReviewReload; await ready();
+  window.setSize(760, 520); await settle();
+
   await evaluate(() => document.querySelector('[data-view="new-story"]').click());
   await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'new-story');
   await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
@@ -221,6 +277,26 @@ async function checkWindow(window, store) {
   await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="pt-BR"]:checked:not(:disabled)')));
   assert.equal(JSON.parse(await fs.readFile(preferencesPath, 'utf8')).defaultStoryLanguage, 'pt-BR');
   assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
+  assert.equal(await evaluate(() => document.querySelectorAll('input[name="gender"]:checked').length), 0);
+  assert.equal(await evaluate(() => document.querySelectorAll('input[name="avatar"]').length), 0);
+  await evaluate(() => document.querySelector('input[name="gender"][value="Male"]').click());
+  assert.equal(await evaluate(() => document.querySelector('input[name="avatar"]:checked').value), 'set_01_male_warrior');
+  assert.equal(await evaluate(() => document.querySelectorAll('input[name="avatar"]').length), 6);
+  await settle();
+  assert.equal(await evaluate(() => [...document.querySelectorAll('.avatar-picker img')].every(img => img.complete && img.naturalWidth > 0)), true);
+  await evaluate(() => document.querySelector('input[name="avatar"][value="set_01_male_mage"]').click());
+  await evaluate(() => document.querySelector('input[name="gender"][value="Male"]').focus());
+  window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Right' });
+  window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Right' });
+  await waitFor(() => Boolean(document.querySelector('input[name="gender"][value="Female"]:checked')));
+  assert.equal(await evaluate(() => document.querySelector('input[name="avatar"]:checked').value), 'set_01_female_mage');
+  assert.equal(await evaluate(() => [...document.querySelectorAll('input[name="avatar"]')].every(input => input.value.startsWith('set_01_female_'))), true);
+  await evaluate(() => document.querySelector('input[name="avatar"]:checked').focus());
+  window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Right' });
+  window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Right' });
+  await waitFor(() => Boolean(document.querySelector('input[name="avatar"][value="set_01_female_cleric"]:checked')));
+  await settle();
+  assert.equal(await evaluate(() => [...document.querySelectorAll('.avatar-picker img')].every(img => img.complete && img.naturalWidth > 0)), true);
   await evaluate(() => {
     document.querySelector('input[name="theme"][value="Horror"]').click();
     document.querySelector('input[name="allocation-method"][value="Balanced"]').click();
@@ -237,7 +313,6 @@ async function checkWindow(window, store) {
     change('[aria-label="Dexterity value"]', '2');
     change('[aria-label="Intelligence value"]', '-1');
     change('.identity-grid input:first-of-type', 'Aveline');
-    change('.identity-grid label:nth-child(2) input', 'Woman');
   });
   assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true,
     'Incomplete Balanced allocation must not advance.');
@@ -274,7 +349,18 @@ async function checkWindow(window, store) {
   assert.equal(generated.language, 'pt-BR');
   assert.match(await evaluate(() => document.querySelector('[aria-label="Adventure language"]').textContent), /Português/);
   assert.equal(generated.character.name, 'Aveline');
-  assert.equal(generated.character.gender, 'Woman');
+  assert.equal(generated.character.gender, 'Female');
+  assert.equal(generated.character.avatarId, 'set_01_female_cleric');
+  assert.equal(await evaluate(() => document.querySelector('.character-portrait').dataset.avatarId), generated.character.avatarId);
+  assert.equal(await evaluate(() => document.querySelector('.branding-frame').nextElementSibling.textContent), 'Aveline');
+  const portraitSave = await fs.readFile(store.activePath, 'utf8');
+  await evaluate(() => document.querySelector('.character-portrait').dispatchEvent(new Event('error')));
+  await waitFor(() => Boolean(document.querySelector('.character-presentation .dice-artwork')));
+  assert.equal(await fs.readFile(store.activePath, 'utf8'), portraitSave);
+  const portraitReload = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload(); await portraitReload; await ready();
+  await waitFor(() => Boolean(document.querySelector('.character-portrait')));
+  assert.equal(await evaluate(() => document.querySelector('.character-portrait').dataset.avatarId), generated.character.avatarId);
   assert.equal(generated.character.nature, 'Good');
   assert.deepEqual(generated.character.attributes,
     { Strength: 3, Dexterity: 2, Intelligence: -2, Endurance: 0, Charisma: 0, Luck: 0 });
@@ -447,6 +533,8 @@ async function checkWindow(window, store) {
   assert.equal(summarized.mainObjective, generated.mainObjective);
   assert.equal(summarized.storyState.location, 'Village');
   assert.equal(summarized.language, 'pt-BR');
+  assert.deepEqual(summarized.character, generated.character, 'Navigation, provider changes, and retries keep the portrait and identity.');
+  assert.equal(await evaluate(() => document.querySelector('.character-portrait').dataset.avatarId), generated.character.avatarId);
   assert.equal(summarized.phase.kind, 'ready');
   assert.equal(summarized.segments.length, 10);
   assert.equal(new Set(summarized.segments.map((segment) => segment.id)).size, 10);
@@ -464,6 +552,27 @@ async function checkWindow(window, store) {
     openai: { modelId: settings.openai.modelId } });
 
   const saved = adventure();
+  const longNamed = structuredClone(saved);
+  longNamed.character = { ...longNamed.character, name: 'A'.repeat(160), gender: 'Female', avatarId: 'set_01_female_mage' };
+  await store.save(longNamed);
+  const longNameReload = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload(); await longNameReload; await ready();
+  await layout();
+  assert.equal(await evaluate(() => {
+    const name = document.querySelector('.character-name');
+    const bounds = name.getBoundingClientRect(), sidebar = document.querySelector('.sidebar').getBoundingClientRect();
+    name.scrollTop = name.scrollHeight;
+    return name.textContent.length === 160 && bounds.left >= sidebar.left && bounds.right <= sidebar.right
+      && name.scrollHeight > name.clientHeight && name.scrollTop > 0;
+  }), true, 'Long names wrap and remain scrollable below the portrait without pushing navigation off screen.');
+  await evaluate(() => {
+    const name = document.querySelector('.character-name');
+    name.scrollTop = 0; name.focus();
+  });
+  window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Down' });
+  window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Down' });
+  await waitFor(() => document.querySelector('.character-name').scrollTop > 0);
+  await capture('portrait-long-name-760');
   await store.save(saved);
   const bytes = await fs.readFile(store.activePath, 'utf8');
   const loaded = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
@@ -471,6 +580,8 @@ async function checkWindow(window, store) {
   await loaded;
   await ready();
   const actualChoices = await evaluate(() => [...document.querySelectorAll('[data-choice-id]')].map((button) => button.textContent));
+  assert.equal(await evaluate(() => Boolean(document.querySelector('.character-presentation .dice-artwork'))), true);
+  assert.equal(await evaluate(() => document.querySelector('.character-name').textContent), saved.character.name);
   assert.deepEqual(actualChoices, saved.segments.at(-1).choices.map((choice) => choice.text));
   assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 0);
   assert.equal(await evaluate(() => document.querySelectorAll('[data-segment-id]').length), saved.segments.length);
@@ -677,7 +788,7 @@ async function checkWindow(window, store) {
     const request = await window.mindtraveller.requestNewStory();
     await window.mindtraveller.resolveNewStory(request.confirmationId, 'Yes');
     return window.mindtraveller.startOpening({ language: 'en', theme: 'Horror', character: {
-      name: 'Aveline', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+      name: 'Aveline', gender: 'Female', avatarId: 'set_01_female_cleric', nature: 'Good', allocationMethod: 'Simplified',
       attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 }
     } });
   });

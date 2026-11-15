@@ -31,7 +31,7 @@ function adventure(chapters = 60) {
   return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1, language: 'en', id: 'long-adventure', theme: 'Horror',
     character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+      name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
     },
     premise: 'A bell rings beneath the abbey.', segments, chapterSummaries,
@@ -64,7 +64,8 @@ test('long adventures use bounded chapter memory while preserving rules, objecti
     assert.ok(estimateContextTokens(text) <= builder.configuration.contextBudgetTokens);
     assert.equal(context.rules, GAME_RULES_TEXT);
     assert.equal(context.theme, saved.theme);
-    assert.deepEqual(context.character, saved.character);
+    const { avatarId, ...identity } = saved.character;
+    assert.deepEqual(context.character, identity);
     assert.equal(context.premise, saved.premise);
     assert.equal(context.globalSummary, saved.globalSummary);
     assert.ok(context.globalSummary.includes('Find Mira’s sister.'));

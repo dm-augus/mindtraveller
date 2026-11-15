@@ -14,7 +14,7 @@ export function RulesView({ adventure }: { adventure: Adventure | null }): React
       {character ? <>
         <dl className="character-identity">
           <div><dt>{t('setup.name')}</dt><dd>{character.name}</dd></div>
-          <div><dt>{t('setup.gender')}</dt><dd>{character.gender}</dd></div>
+          <div><dt>{t('setup.gender')}</dt><dd>{label(character.gender)}</dd></div>
           <div><dt>{label('Nature')}</dt><dd>{label(character.nature)}</dd></div>
         </dl>
         <dl className="character-attributes">{ATTRIBUTE_NAMES.map((name) => <div key={name}>

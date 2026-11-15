@@ -3,6 +3,8 @@ import { useLocale } from './LocaleContext';
 import type { MessageKey } from '../shared/i18n';
 import React, { useState } from 'react';
 import { StoryLanguageSelector } from './StoryLanguageSelector';
+import { AvatarPicker } from './AvatarPicker';
+import { avatarForGender, CHARACTER_GENDERS, type AvatarId } from '../shared/avatars';
 import type { StoryLanguage } from '../shared/types';
 import {
   ALLOCATION_METHODS, ATTRIBUTE_NAMES, ATTRIBUTE_RANGES, NATURES, THEMES,
@@ -10,7 +12,7 @@ import {
 } from '../shared/character-rules';
 import { ALLOCATION_BUDGETS } from '../shared/rules';
 import type { CharacterSetup } from '../shared/character-rules';
-import type { AllocationMethod, AttributeName, Attributes, Nature, Theme } from '../shared/types';
+import type { AllocationMethod, AttributeName, Attributes, Nature, Theme, NewCharacterGender } from '../shared/types';
 
 const THEME_DESCRIPTIONS: Record<Theme, MessageKey> = {
   Horror: 'setup.horror',
@@ -31,14 +33,15 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
   const [method, setMethod] = useState<AllocationMethod | ''>('');
   const [attributes, setAttributes] = useState<Attributes>(createInitialAttributes);
   const [name, setName] = useState('');
-  const [gender, setGender] = useState('');
+  const [gender, setGender] = useState<NewCharacterGender | ''>('');
+  const [avatarId, setAvatarId] = useState<AvatarId | null>(null);
   const [nature, setNature] = useState<Nature | ''>('');
 
   const allocation = validateAttributeAllocation(method, attributes);
   const setup = validateCharacterSetup({
     language,
     theme,
-    character: { name, gender, nature, allocationMethod: method, attributes }
+    character: { name, gender, avatarId, nature, allocationMethod: method, attributes }
   });
   const values = ATTRIBUTE_NAMES.map((attribute) => attributes[attribute]);
   const positive = values.reduce((total, value) => total + Math.max(0, value), 0);
@@ -110,9 +113,15 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
       <div className="identity-grid">
         <label>{t('setup.name')}<input type="text" value={name} onChange={(event) => setName(event.target.value)}
           disabled={busy} maxLength={80} autoComplete="off" required /></label>
-        <label>{t('setup.gender')}<input type="text" value={gender} onChange={(event) => setGender(event.target.value)}
-          disabled={busy} maxLength={80} autoComplete="off" required /></label>
       </div>
+      <fieldset className="gender-selector"><legend>{t('setup.gender')}</legend>
+        <div className="setup-options gender-options">{CHARACTER_GENDERS.map(value =>
+          <label key={value} className={`setup-option${gender === value ? ' is-selected' : ''}`}>
+            <input type="radio" name="gender" value={value} checked={gender === value} disabled={busy} required
+              onChange={() => { setGender(value); setAvatarId(previous => avatarForGender(value, previous)); }} />
+            <span><strong>{label(value)}</strong></span>
+          </label>)}</div>
+      </fieldset>
       <p className="setup-help">{t('setup.natureHelp')}</p>
       <div className="setup-options nature-options">{NATURES.map((option) =>
         <label key={option} className={`setup-option${nature === option ? ' is-selected' : ''}`}>
@@ -122,6 +131,8 @@ export function NewStorySetup({ busy, onStart }: NewStorySetupProps): React.JSX.
         </label>
       )}</div>
     </fieldset>
+
+    <AvatarPicker gender={gender} selected={avatarId} disabled={busy} onSelect={setAvatarId} />
 
     <div className="setup-actions">
       <p>{setup.valid ? t('setup.ready') : t('setup.incomplete')}</p>

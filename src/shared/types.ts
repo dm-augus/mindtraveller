@@ -1,4 +1,7 @@
+import type { AvatarId } from './avatars';
+
 export type Theme = 'Horror' | 'Romance' | 'High Fantasy';
+export type NewCharacterGender = 'Male' | 'Female';
 export type StoryLanguage = 'en' | 'pt-BR';
 export type InterfaceLanguage = 'en' | 'pt-BR';
 export interface StoryPreferences {
@@ -23,6 +26,7 @@ export type Attributes = Record<AttributeName, number>;
 export interface Character {
   name: string;
   gender: string;
+  avatarId: AvatarId | null;
   nature: Nature;
   allocationMethod: AllocationMethod;
   attributes: Attributes;

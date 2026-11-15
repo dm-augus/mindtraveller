@@ -1,5 +1,5 @@
 import { createCheckRecord, type CheckSelection } from './action-rules';
-import { validateCharacterSetup } from './character-rules';
+import { THEMES, validateSavedCharacter } from './character-rules';
 import { ATTRIBUTE_NAMES } from './rules';
 import type { Adventure } from './types';
 import { isStoryLanguage } from './story-language';
@@ -99,7 +99,7 @@ export function isAdventure(value: unknown): value is Adventure {
   if (!isRecord(value)) return false;
   const character = value.character;
   if (!isRecord(character) || !hasOnlyKeys(character, [
-    'name', 'gender', 'nature', 'allocationMethod', 'attributes'
+    'name', 'gender', 'avatarId', 'nature', 'allocationMethod', 'attributes'
   ])) return false;
   if (!isRecord(character.attributes) || !hasOnlyKeys(character.attributes, ATTRIBUTE_NAMES)) return false;
 
@@ -110,7 +110,8 @@ export function isAdventure(value: unknown): value is Adventure {
     && value.schemaVersion === 1
     && isStoryLanguage(value.language)
     && isText(value.id)
-    && validateCharacterSetup({ theme: value.theme, character: value.character }).valid
+    && THEMES.some(theme => theme === value.theme)
+    && validateSavedCharacter(value.character).valid
     && (value.premise === null || typeof value.premise === 'string')
     && (value.mainObjective === null || isText(value.mainObjective))
     && (value.storyState === null || isStoryState(value.storyState))

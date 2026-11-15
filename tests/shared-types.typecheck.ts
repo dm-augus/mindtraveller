@@ -26,7 +26,7 @@ const validAdventure: Adventure = {
   theme: 'High Fantasy',
   character: {
     name: 'Mira',
-    gender: 'Woman',
+    gender: 'Woman', avatarId: null,
     nature: 'Good',
     allocationMethod: 'Balanced',
     attributes: {

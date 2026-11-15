@@ -11,7 +11,7 @@ void (async () => {
     const profile = await fs.mkdtemp(path.join(output, `${language}-`));
     const controller = new StoryController(new AdventureStore(profile), async () => ({ provider, modelId: 'llama3:latest' }));
     const opening = await controller.startOpening({ language, theme: 'High Fantasy', character: {
-      name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+      name: 'Mira', gender: 'Female', avatarId: 'set_01_female_warrior', nature: 'Good', allocationMethod: 'Simplified',
       attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 }
     } });
     await fs.writeFile(path.join(output, `${language}-opening.json`), JSON.stringify(opening, null, 2));

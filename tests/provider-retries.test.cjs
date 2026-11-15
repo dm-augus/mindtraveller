@@ -14,7 +14,7 @@ const { ProviderContractError } = require('../dist/shared/provider-contract.js')
 
 const secret = 'sk-test-private-response-data';
 const character = {
-  name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
+  name: 'Mira', gender: 'Woman', avatarId: null, nature: 'Good', allocationMethod: 'Balanced',
   attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
 };
 const choices = [
@@ -104,6 +104,32 @@ async function stub(t, provider, handler, timeoutMs = 1000) {
       fetchImpl: (url, init) => fetch(`${address}${new URL(url).pathname}`, init)
     });
   return { adapter, requests };
+}
+
+for (const provider of ['ollama', 'openai']) for (const gender of ['Male', 'Female']) {
+  test(`${provider} automatic retries retain ${gender} identity and checks without portraits`, async (t) => {
+    for (const operation of operations) {
+      const identity = { ...character, gender, avatarId: `set_01_${gender.toLowerCase()}_mage` };
+      const { adapter, requests } = await stub(t, provider, (response, count) => {
+        output(response, provider, count === 1 ? operation.invalid : operation.valid);
+      });
+      const request = { ...operation.request, language: 'pt-BR' };
+      if (operation.method === 'generateOpening') request.character = identity;
+      else request.context = JSON.stringify({ character: identity, situation: operation.request.context });
+      const before = structuredClone(request);
+      assert.deepEqual(await adapter[operation.method](freeze(request)), operation.valid);
+      assert.equal(requests.length, 2);
+      for (const body of requests) {
+        const messages = body.messages ?? body.input;
+        const payload = JSON.parse(messages[1].content);
+        assert.equal((payload.character ?? payload.context.character).gender, gender);
+        assert.doesNotMatch(JSON.stringify(messages), /avatarId|set_01_|\.png/);
+        if (operation.method === 'narrateCheck') assert.deepEqual(payload.check, check);
+        if (operation.method === 'assessAction') assert.deepEqual(payload.attributes, character.attributes);
+      }
+      assert.deepEqual(request, before);
+    }
+  });
 }
 
 function output(response, provider, value, mode = 'content') {

@@ -24,6 +24,18 @@ button img { flex: 0 0 auto; object-fit: contain; image-rendering: pixelated; }
 }
 .branding-frame { border: 3px solid; border-color: #646773 #e9edf4 #e9edf4 #646773; background: #111022; margin-bottom: 10px; }
 .dice-artwork { width: 100%; max-height: 100px; display: block; object-fit: contain; image-rendering: pixelated; }
+.character-portrait { width: 100%; height: 150px; display: block; object-fit: contain; image-rendering: pixelated; }
+.character-presentation { min-width: 0; flex-shrink: 0; }
+.character-name:focus-visible { outline: 2px dotted var(--navy); outline-offset: -2px; }
+.character-name { display: block; margin: -4px 0 10px; max-height: 2.4em; overflow-y: auto; font-size: 14px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; }
+.gender-selector { min-width: 0; margin: 0 0 16px; padding: 0; border: 0; }
+.new-story-setup .gender-selector legend { padding: 0 0 6px; background: none; color: inherit; font-size: 13px; }
+.gender-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.avatar-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.avatar-option span { width: 100%; text-align: center; overflow-wrap: anywhere; }
+.avatar-option img { width: 100%; height: 112px; object-fit: contain; image-rendering: pixelated; background: #111022; }
+.avatar-option:has(input:focus-visible) { outline: 2px dotted var(--navy); outline-offset: -5px; }
+@media (max-height: 650px) { .character-portrait { height: 72px; } }
 .nav-button span { min-width: 0; overflow-wrap: anywhere; }
 html[lang="pt-BR"] .nav-button { font-size: 16px; }
 html[lang="pt-BR"] .nav-button[data-view="settings"] span {
@@ -97,9 +109,9 @@ html[lang="pt-BR"] .nav-button[data-view="settings"] span {
 .pending-story > p { margin: 8px 0 0; }
 .pending-story .check-result { margin: 13px 0 0; }
 .pending-story .check-result:first-child { margin-top: 0; }
-.page-introduction { max-width: 730px; padding: 7px 3px; }
+.page-introduction { min-width: 0; padding: 7px 3px; }
 .page-introduction h2 { margin: 8px 0 18px; font-size: 25px; color: #20194d; }
-.new-story-setup { max-width: 850px; display: grid; gap: 22px; padding-bottom: 18px; }
+.new-story-setup { width: 100%; min-width: 0; container-type: inline-size; display: grid; gap: 22px; padding-bottom: 18px; }
 .new-story-setup .page-introduction p:last-child { margin-bottom: 0; }
 .setup-group { min-width: 0; margin: 0; padding: 15px; border: 2px solid; border-color: #686674 #fff #fff #686674; background: #d7d3cd; }
 .setup-group legend { padding: 3px 9px; background: #000080; color: #fff; font-weight: bold; font-size: 15px; line-height: 1.4; }
@@ -123,7 +135,7 @@ html[lang="pt-BR"] .nav-button[data-view="settings"] span {
 .allocation-status { margin: 16px 0 3px !important; font-size: 13px; font-weight: bold; }
 .allocation-status.is-invalid { color: #7e2920; }
 .setup-feedback { margin: 3px 0 0 !important; color: #7e2920; font-size: 12px; }
-.identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin-bottom: 16px; }
+.identity-grid { display: grid; grid-template-columns: 1fr; gap: 13px; margin-bottom: 16px; }
 .identity-grid label { min-width: 0; display: grid; gap: 5px; font-size: 13px; font-weight: bold; }
 .identity-grid input { width: 100%; padding: 8px; border: 2px solid; border-color: #666 #fff #fff #666; background: #f6f4f0; font: inherit; }
 .setup-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
@@ -141,7 +153,13 @@ html[lang="pt-BR"] .nav-button[data-view="settings"] span {
 .character-identity div, .character-attributes div { min-width: 0; }
 .character-identity dt, .character-attributes dt { color: #555160; font-size: 12px; }
 .character-identity dd, .character-attributes dd { margin: 3px 0 0; font-weight: bold; overflow-wrap: anywhere; }
-.settings-content { max-width: 850px; display: grid; gap: 18px; padding-bottom: 18px; }
+.settings-content { width: 100%; min-width: 0; container-type: inline-size; display: grid; gap: 18px; padding-bottom: 18px; }
+.settings-columns { display: grid; gap: 18px; align-items: start; }
+.settings-preferences, .settings-provider { min-width: 0; display: grid; gap: 18px; }
+@container (min-width: 900px) {
+  .settings-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .avatar-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
 .settings-field { display: grid; gap: 6px; margin: 12px 0; font-size: 13px; font-weight: bold; }
 .settings-field input, .settings-field select { width: 100%; min-width: 0; padding: 8px; border: 2px solid; border-color: #666 #fff #fff #666; background: #f6f4f0; font: inherit; }
 .settings-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }

@@ -28,7 +28,7 @@ const simplified = {
 function setup(allocationMethod, attributes) {
   return {
     theme: 'Horror',
-    character: { name: '  Mira  ', gender: '  Woman  ', nature: 'Good', allocationMethod, attributes }
+    character: { name: '  Mira  ', gender: 'Female', avatarId: 'set_01_female_warrior', nature: 'Good', allocationMethod, attributes }
   };
 }
 
@@ -82,7 +82,7 @@ test('out-of-range, fractional, missing, and extra attributes are rejected', () 
 
 test('theme, identity, Nature, and allocation method are required', () => {
   assert.equal(validateCharacterSetup(setup('Balanced', balanced)).value.character.name, 'Mira');
-  assert.equal(validateCharacterSetup(setup('Balanced', balanced)).value.character.gender, 'Woman');
+  assert.equal(validateCharacterSetup(setup('Balanced', balanced)).value.character.gender, 'Female');
   for (const theme of ['Horror', 'Romance', 'High Fantasy']) {
     for (const nature of ['Good', 'Neutral', 'Bad']) {
       assert.equal(validateCharacterSetup({ ...setup('Simplified', simplified), theme,
