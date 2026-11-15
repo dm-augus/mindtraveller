@@ -11,8 +11,8 @@ const check = {
 const pendingChoice = { turnId: 'turn-3', choiceId: 'enter', choiceText: 'Enter the crypt.' };
 
 function adventure() {
-  return {
-    schemaVersion: 1, id: 'adventure-1', theme: 'Horror',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
+    schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
@@ -155,6 +155,7 @@ test('opening requests use shared rules and configured targets with no existing 
   const builder = new StoryContextBuilder({ paragraphTarget: 2, choiceTarget: 4 });
   const request = builder.openingRequest('story-model', saved);
   assert.deepEqual(request, {
+    language: 'en',
     modelId: 'story-model', theme: saved.theme, character: saved.character,
     rules: GAME_RULES_TEXT, paragraphTarget: 2, choiceTarget: 4
   });

@@ -2,7 +2,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const http = require('node:http');
 const path = require('node:path');
-const { app, safeStorage } = require('electron');
+const { app, safeStorage, dialog } = require('electron');
+let exportDialog;
+dialog.showSaveDialog = async (_window, options) => {
+  assert.equal(options.title, 'Export History');
+  assert.ok(exportDialog, 'Unexpected save dialog');
+  return exportDialog(options);
+};
 const { AdventureStore } = require('../dist/main/adventure-storage.js');
 const { ProviderSettingsStore } = require('../dist/main/provider-settings.js');
 
@@ -15,6 +21,7 @@ let openingRequests = 0;
 let failOpeningOnce = false;
 let checkedAssessments = 0;
 let simpleAssessments = 0;
+let openAiContinuations = 0;
 const narratedChecks = [];
 const openAiOperations = [];
 let failGlobalSummaryOnce = true;
@@ -34,7 +41,10 @@ globalThis.fetch = async (url, options) => {
   let content;
   if (prompt.operation === 'assessment') {
     assert.equal(prompt.choice.choiceId, 'wait');
-    content = { kind: 'no-check', narrative: 'Aveline waits while the village bell rings.', choices: [
+    openAiContinuations++;
+    assert.equal(typeof prompt.context, 'object');
+    assert.equal(prompt.context.mainObjective, 'Find the source of the village bell.');
+    content = { storyState: { location: 'Village', situation: `Bell ${openAiContinuations} rings while Aveline waits.`, currentFocus: 'Listen for the bell’s source.' }, kind: 'no-check', narrative: `Aveline hears bell ${openAiContinuations} while waiting in the village.`, choices: [
       { id: 'wait', text: 'Wait for the bell.' },
       { id: 'ask', text: 'Ask about the bell.' },
       { id: 'enter', text: 'Enter the crypt.' }
@@ -64,8 +74,8 @@ async function finish(code, error) {
 }
 
 function adventure() {
-  return {
-    schemaVersion: 1, id: 'shell-fixture', theme: 'High Fantasy',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
+    schemaVersion: 1, language: 'en', id: 'shell-fixture', theme: 'High Fantasy',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
@@ -90,6 +100,7 @@ function adventure() {
 }
 
 async function checkWindow(window, store) {
+  window.webContents.backgroundThrottling = false;
   const evaluate = async (fn, ...args) => {
     try { return await window.webContents.executeJavaScript(`(${fn.toString()})(...${JSON.stringify(args)})`); }
     catch (error) { throw new Error(`Renderer check failed: ${fn.toString()}`, { cause: error }); }
@@ -108,8 +119,46 @@ async function checkWindow(window, store) {
       && [...document.images].every((image) => image.complete && image.naturalWidth > 0));
   }
   async function capture(name) {
-    await settle();
-    await fs.writeFile(path.join(output, `${name}.png`), (await window.webContents.capturePage(undefined, { stayAwake: true })).toPNG());
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      await settle();
+      try {
+        await fs.writeFile(path.join(output, `${name}.png`), (await window.webContents.capturePage(undefined, { stayAwake: true })).toPNG());
+        return;
+      } catch (error) {
+        if (attempt === 5 || !String(error).includes('UnknownVizError')) {
+          throw new Error(`Screenshot failed: ${name}`, { cause: error });
+        }
+        window.webContents.invalidate();
+      }
+    }
+  }
+  async function checkExport(name, pendingRoll = null) {
+    const bytes = await fs.readFile(store.activePath, 'utf8');
+    const calls = JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations });
+    const destination = path.join(output, `${name}.md`);
+    let release;
+    exportDialog = () => new Promise((resolve) => { release = resolve; });
+    await evaluate(() => {
+      const button = document.querySelector('[data-action="export-history"]');
+      button.click(); button.click();
+    });
+    await waitFor(() => document.querySelector('[data-action="export-history"]').textContent.includes('Exporting'));
+    assert.equal(await evaluate(() => document.querySelector('[data-view="new-story"]').disabled), true);
+    assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:not(:disabled)').length), 0);
+    await assert.rejects(evaluate(() => window.mindtraveller.requestNewStory()));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(release);
+    release({ canceled: false, filePath: destination });
+    await waitFor(() => Boolean(document.querySelector('.export-feedback')));
+    const text = await fs.readFile(destination, 'utf8');
+    assert.match(text, /# Mindtraveller/);
+    if (pendingRoll) {
+      assert.match(text, /Pending state/);
+      assert.ok(text.includes(`D100 ${pendingRoll.roll} · Threshold ${pendingRoll.threshold}`));
+    }
+    assert.equal(await fs.readFile(store.activePath, 'utf8'), bytes);
+    assert.equal(JSON.stringify({ openingRequests, checkedAssessments, simpleAssessments, narratedChecks, openAiOperations }), calls);
+    exportDialog = undefined;
   }
   async function layout() {
     const metrics = await evaluate(() => {
@@ -147,6 +196,7 @@ async function checkWindow(window, store) {
   // Windows may round a physical pixel when converting back to scaled DIP sizes.
   assert.ok(window.getSize().every((size, index) => Math.abs(size - [1200, 800][index]) <= 1));
   assert.match(await evaluate(() => document.querySelector('.story-scroll').textContent), /A new adventure awaits/);
+  assert.equal(await evaluate(() => document.querySelector('[data-action="export-history"]').disabled), true);
   await layout();
   await capture('shell-empty-1200');
   window.setSize(760, 520);
@@ -156,6 +206,20 @@ async function checkWindow(window, store) {
 
   await evaluate(() => document.querySelector('[data-view="new-story"]').click());
   await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'new-story');
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
+  const preferencesPath = path.join(userData, 'mindtraveller', 'preferences.json');
+  await assert.rejects(evaluate(() => window.mindtraveller.saveStoryPreferences({ defaultStoryLanguage: 'fr' })));
+  // Force a real write failure without modifying the user's profile.
+  await fs.mkdir(`${preferencesPath}.tmp`, { recursive: true });
+  await evaluate(() => document.querySelector('input[name="story-language"][value="pt-BR"]').click());
+  await waitFor(() => Boolean(document.querySelector('.language-error')));
+  assert.equal(await evaluate(() => document.querySelector('input[name="story-language"][value="en"]').checked), true);
+  await fs.rmdir(`${preferencesPath}.tmp`);
+  await evaluate(() => document.querySelector('input[name="story-language"][value="en"]').focus());
+  window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Right' });
+  window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Right' });
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="pt-BR"]:checked:not(:disabled)')));
+  assert.equal(JSON.parse(await fs.readFile(preferencesPath, 'utf8')).defaultStoryLanguage, 'pt-BR');
   assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
   await evaluate(() => {
     document.querySelector('input[name="theme"][value="Horror"]').click();
@@ -203,8 +267,12 @@ async function checkWindow(window, store) {
   await waitFor(() => document.querySelector('.app-shell').dataset.currentView === 'story'
     && document.querySelectorAll('[data-choice-id]').length === 3);
   const generated = await store.load();
+  assert.equal(generated.mainObjective, 'Find the source of the village bell.');
+  assert.equal(generated.storyState.location, 'Crypt entrance');
   assert.equal(openingRequests, 1);
   assert.equal(generated.theme, 'Horror');
+  assert.equal(generated.language, 'pt-BR');
+  assert.match(await evaluate(() => document.querySelector('[aria-label="Adventure language"]').textContent), /Português/);
   assert.equal(generated.character.name, 'Aveline');
   assert.equal(generated.character.gender, 'Woman');
   assert.equal(generated.character.nature, 'Good');
@@ -212,6 +280,40 @@ async function checkWindow(window, store) {
     { Strength: 3, Dexterity: 2, Intelligence: -2, Endurance: 0, Charisma: 0, Luck: 0 });
   assert.equal(generated.phase.kind, 'ready');
   await capture('setup-generated-760');
+  const measurements = [];
+  for (const [width, height] of [[1200, 800], [760, 520]]) {
+    window.setSize(width, height);
+    await settle();
+    measurements.push(await evaluate(() => ({ width: innerWidth, height: innerHeight,
+      narrativeHeight: document.querySelector('.story-scroll').clientHeight,
+      fontSize: getComputedStyle(document.querySelector('.story-scroll')).fontSize,
+      decisionFontSize: getComputedStyle(document.querySelector('.choice-button')).fontSize })));
+    await capture(`layout-short-choices-${width}`);
+  }
+  const measuringBaseline = process.env.MINDTRAVELLER_CAPTURE_LAYOUT_BASELINE === '1';
+  await fs.writeFile(path.join(output, measuringBaseline ? 'layout-baseline.json' : 'layout-after.json'), JSON.stringify(measurements, null, 2));
+  if (!measuringBaseline) {
+    assert.equal(await evaluate(() => document.querySelector('.titlebar') === null), true);
+    assert.match(window.getTitle(), /Mindtraveller/);
+    assert.match(await evaluate(() => document.querySelector('.story-genre').textContent), /Horror/);
+    const baseline = JSON.parse(await fs.readFile(path.join(__dirname, '../docs/layout-baseline.json'), 'utf8'));
+    for (let index = 0; index < measurements.length; index += 1) {
+      assert.ok(measurements[index].narrativeHeight > baseline[index].narrativeHeight,
+        `Narrative viewport must increase: ${JSON.stringify({ before: baseline[index], after: measurements[index] })}`);
+      assert.equal(measurements[index].fontSize, baseline[index].fontSize);
+      assert.equal(measurements[index].decisionFontSize, baseline[index].decisionFontSize);
+    }
+  }
+  await checkExport('history-ready');
+  exportDialog = async () => ({ canceled: false, filePath: output });
+  await evaluate(() => document.querySelector('[data-action="export-history"]').click());
+  await waitFor(() => Boolean(document.querySelector('.error-banner')));
+  assert.equal(await evaluate(() => Boolean(document.querySelector('.export-feedback'))), false);
+  exportDialog = async () => ({ canceled: true });
+  await evaluate(() => document.querySelector('[data-action="export-history"]').click());
+  await waitFor(() => document.querySelector('[data-action="export-history"]').disabled === false);
+  assert.equal(await evaluate(() => Boolean(document.querySelector('.error-banner, .export-feedback'))), false);
+  exportDialog = undefined;
 
   await evaluate(() => document.querySelector('[data-choice-id="enter"]').click());
   assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 3);
@@ -220,6 +322,7 @@ async function checkWindow(window, store) {
   const pendingCheck = (await store.load()).phase.check;
   assert.equal((await store.load()).phase.kind, 'pending-narration');
   assert.equal(checkedAssessments, 1);
+  await checkExport('history-pending-check', pendingCheck);
   const checkText = await evaluate(() => document.querySelector('[aria-label="Saved check result"]').textContent);
   assert.match(checkText, /Hard/);
   assert.match(checkText, /Strength \+3/);
@@ -251,6 +354,9 @@ async function checkWindow(window, store) {
   await waitFor(() => document.querySelectorAll('[data-segment-id]').length === 2
     && document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const checked = await store.load();
+  assert.equal(checked.mainObjective, generated.mainObjective);
+  assert.equal(checked.storyState.location, 'Crypt entrance');
+  assert.notDeepEqual(checked.storyState, generated.storyState);
   assert.equal(checked.phase.kind, 'ready');
   assert.deepEqual(checked.segments.at(-1).check, pendingCheck);
   assert.equal(checked.segments[0].selectedChoiceId, 'enter');
@@ -280,6 +386,8 @@ async function checkWindow(window, store) {
   await waitFor(() => document.querySelectorAll('[data-segment-id]').length === 3
     && document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const simple = await store.load();
+  assert.equal(simple.mainObjective, generated.mainObjective);
+  assert.equal(simple.storyState.currentFocus, 'Investigate the village warning.');
   assert.equal(simple.phase.kind, 'ready');
   assert.equal(simple.segments.at(-1).check, null);
   assert.equal(simple.segments[1].selectedChoiceId, 'ask');
@@ -292,6 +400,11 @@ async function checkWindow(window, store) {
 
   await evaluate(() => document.querySelector('[data-view="settings"]').click());
   await waitFor(() => Boolean(document.querySelector('.settings-content')));
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="pt-BR"]:checked:not(:disabled)')));
+  const beforePreference = await fs.readFile(store.activePath, 'utf8');
+  await evaluate(() => document.querySelector('input[name="story-language"][value="en"]').click());
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
+  assert.equal(await fs.readFile(store.activePath, 'utf8'), beforePreference);
   await evaluate(() => document.querySelector('input[name="provider"][value="openai"]').click());
   await evaluate(() => {
     const field = document.querySelector('input[type="password"]');
@@ -331,6 +444,9 @@ async function checkWindow(window, store) {
   await evaluate(() => document.querySelector('.retry-button').click());
   await waitFor(() => document.querySelectorAll('[data-choice-id]:disabled').length === 0);
   const summarized = await store.load();
+  assert.equal(summarized.mainObjective, generated.mainObjective);
+  assert.equal(summarized.storyState.location, 'Village');
+  assert.equal(summarized.language, 'pt-BR');
   assert.equal(summarized.phase.kind, 'ready');
   assert.equal(summarized.segments.length, 10);
   assert.equal(new Set(summarized.segments.map((segment) => segment.id)).size, 10);
@@ -447,6 +563,7 @@ async function checkWindow(window, store) {
     && !document.querySelector('[role="alertdialog"]'));
   assert.equal(await store.load(), null);
   assert.equal(await evaluate(() => document.querySelector('.setup-start').disabled), true);
+  await waitFor(() => Boolean(document.querySelector('input[name="story-language"][value="en"]:checked:not(:disabled)')));
   await capture('shell-new-story-after-confirm-760');
 
   const pendingOpening = structuredClone(saved);
@@ -486,6 +603,89 @@ async function checkWindow(window, store) {
   assert.equal(await evaluate(() => document.querySelectorAll('[data-choice-id]:disabled').length), 4);
   await layout();
   await capture('shell-pending-760');
+  if (!measuringBaseline) {
+    const longChoices = pending.segments.at(-1).choices.map((choice, index) => ({ ...choice,
+      text: `${index + 1}. Investigar cuidadosamente as inscrições à entrada da abadia e conversar com os viajantes sobre a maldição, sem abandonar os companheiros que aguardam notícias na praça da aldeia.` }));
+    const longResults = [];
+    for (const state of ['ready', 'pending-narration']) {
+      const portuguese = structuredClone(pending);
+      portuguese.language = 'pt-BR';
+      portuguese.segments.at(-1).choices = longChoices;
+      portuguese.segments.at(-1).narrative = 'Através das ruínas, a viajante procura notícias dos companheiros.\n\n'.repeat(8);
+      portuguese.segments.at(-1).selectedChoiceId = state === 'ready' ? null : 'merchant';
+      portuguese.phase = state === 'ready' ? { kind: 'ready' }
+        : { ...pending.phase, choice: { ...pending.phase.choice, choiceText: longChoices[0].text } };
+      await store.save(portuguese);
+      const loaded = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
+      window.webContents.reload(); await loaded; await ready();
+      for (const [width, height] of [[1200, 800], [760, 520]]) {
+        window.setSize(width, height); await settle(); await layout();
+        const detail = await evaluate(() => {
+          const story = document.querySelector('.story-scroll'), decisions = document.querySelector('.choice-list');
+          const before = story.scrollTop;
+          const last = document.querySelector('[data-choice-id]:last-child');
+          last.scrollIntoView({ block: 'end', container: 'nearest' });
+          return { narrativeHeight: story.clientHeight, storyFontSize: getComputedStyle(story).fontSize,
+            decisionOverflow: decisions.scrollHeight > decisions.clientHeight,
+            horizontalOverflow: decisions.scrollWidth > decisions.clientWidth,
+            decisionsScroll: decisions.scrollTop, storyUnchanged: story.scrollTop === before,
+            wrapped: [...document.querySelectorAll('[data-choice-id] span')].every((label) => label.getBoundingClientRect().height > 30) };
+        });
+        assert.ok(detail.narrativeHeight >= 100);
+        assert.equal(detail.decisionOverflow, true);
+        assert.equal(detail.horizontalOverflow, false);
+        assert.ok(detail.decisionsScroll > 0);
+        assert.equal(detail.storyUnchanged, true, 'Decision scrolling must not move the narrative');
+        assert.equal(detail.wrapped, true);
+        assert.equal(detail.storyFontSize, width === 1200 ? '17px' : '16px');
+        await evaluate(() => document.querySelector('.story-scroll').focus());
+        window.focus(); window.webContents.focus();
+        window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+        window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
+        await settle();
+        const focus = await evaluate(() => {
+          const active = document.activeElement, style = getComputedStyle(active);
+          active.scrollIntoView({ block: 'nearest', container: 'nearest' });
+          const pane = document.querySelector('.choice-list').getBoundingClientRect(), rect = active.getBoundingClientRect();
+          return { control: active.matches('.choice-button, .retry-button'), visible: active.matches(':focus-visible'),
+            outline: style.outlineStyle, width: style.outlineWidth, inView: rect.top >= pane.top - 1 && rect.bottom <= pane.bottom + 1 };
+        });
+        assert.equal(focus.control, true, JSON.stringify(focus)); assert.equal(focus.visible, true, JSON.stringify(focus));
+        assert.equal(focus.outline, 'dotted'); assert.ok(parseFloat(focus.width) >= 1.5, 'Focus outline must remain visible under Windows display scaling');
+        assert.equal(focus.inView, true);
+        if (state === 'pending-narration') {
+          for (const selector of ['.pending-hint', '.pending-roll-summary', '.retry-button']) {
+            assert.equal(await evaluate((target) => {
+              const element = document.querySelector(target); element.scrollIntoView({ block: 'center', container: 'nearest' });
+              const bounds = element.getBoundingClientRect(), pane = document.querySelector('.choice-list').getBoundingClientRect();
+              return bounds.top >= pane.top - 1 && bounds.bottom <= pane.bottom + 1;
+            }, selector), true, `${selector} must be reachable`);
+          }
+        }
+        longResults.push({ state, width, height, ...detail, focus });
+        const headerPosition = await evaluate(() => ({ titleTop: document.querySelector('#view-title').getBoundingClientRect().top,
+          parents: ['.section-header', '.story-panel', '.adventure-body', '.workspace', '.app-shell'].map((selector) => {
+            const element = document.querySelector(selector); return { selector, top: element.getBoundingClientRect().top, scroll: element.scrollTop };
+          }) }));
+        assert.ok(headerPosition.titleTop >= 0, JSON.stringify(headerPosition));
+        await capture(`layout-portuguese-${state}-${width}`);
+      }
+    }
+    await fs.writeFile(path.join(output, 'layout-long-choices.json'), JSON.stringify(longResults, null, 2));
+  }
+  const english = await evaluate(async () => {
+    const request = await window.mindtraveller.requestNewStory();
+    await window.mindtraveller.resolveNewStory(request.confirmationId, 'Yes');
+    return window.mindtraveller.startOpening({ language: 'en', theme: 'Horror', character: {
+      name: 'Aveline', gender: 'Woman', nature: 'Good', allocationMethod: 'Simplified',
+      attributes: { Strength: 3, Dexterity: 0, Intelligence: 0, Endurance: 0, Charisma: 0, Luck: 0 }
+    } });
+  });
+  assert.equal(english.language, 'en');
+  assert.equal(english.segments.length, 1);
+  const englishReload = new Promise((resolve) => window.webContents.once('did-finish-load', resolve));
+  window.webContents.reload(); await englishReload; await ready();
+  assert.match(await evaluate(() => document.querySelector('[aria-label="Adventure language"]').textContent), /English/);
   const quitBytes = await fs.readFile(store.activePath, 'utf8');
   app.once('will-quit', (event) => {
     event.preventDefault();
@@ -497,7 +697,7 @@ async function checkWindow(window, store) {
       await finish(0);
     })().catch((error) => finish(1, error));
   });
-  await evaluate(() => document.querySelector('[data-action="quit"]').click());
+  void evaluate(() => document.querySelector('[data-action="quit"]').click()).catch(() => {});
 }
 
 void (async () => {
@@ -517,6 +717,7 @@ void (async () => {
     for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw);
     const prompt = JSON.parse(body.messages[1].content);
+    assert.deepEqual(body.options, { num_ctx: 8192, num_predict: 1536 });
     const choices = [
       { id: 'enter', text: 'Enter the crypt.' },
       { id: 'ask', text: 'Question the villagers.' },
@@ -528,7 +729,7 @@ void (async () => {
       assert.equal(prompt.theme, 'Horror');
       assert.equal(prompt.character.name, 'Aveline');
       openingRequests += 1;
-      content = { premise: 'A bell rings beneath the village.',
+      content = { mainObjective: 'Find the source of the village bell.', storyState: { location: 'Crypt entrance', situation: 'Aveline stands outside the crypt.', currentFocus: 'Investigate the crypt.' }, premise: 'A bell rings beneath the village.',
         narrative: 'Aveline approaches the crypt. The villagers wait behind her.', choices };
     } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'enter') {
       checkedAssessments += 1;
@@ -536,12 +737,12 @@ void (async () => {
     } else if (prompt.operation === 'assessment' && prompt.choice.choiceId === 'ask') {
       simpleAssessments += 1;
       if (simpleAssessments === 1) { response.writeHead(503).end(); return; }
-      content = { kind: 'no-check', narrative: 'The villagers share a warning.',
+      content = { storyState: { location: 'Village', situation: 'The villagers have shared a warning.', currentFocus: 'Investigate the village warning.' }, kind: 'no-check', narrative: 'The villagers share a warning.',
         choices: choices.map((choice) => ({ ...choice, text: `${choice.text} Follow the villagers' warning.` })) };
     } else if (prompt.operation === 'checked-narration') {
       narratedChecks.push(prompt.check);
       if (narratedChecks.length === 1) { response.writeHead(503).end(); return; }
-      content = { outcome: prompt.check.outcome,
+      content = { storyState: { location: 'Crypt entrance', situation: prompt.check.outcome === 'success' ? 'The crypt door is open.' : 'The crypt door resisted the attempt.', currentFocus: 'Find the bell beyond the door.' }, outcome: prompt.check.outcome,
         narrative: prompt.check.outcome === 'success' ? 'Aveline opens the crypt door.' : 'The crypt door resists Aveline.',
         choices: choices.map((choice) => ({ ...choice, text: `${choice.text} After the crypt door attempt.` })) };
     } else {

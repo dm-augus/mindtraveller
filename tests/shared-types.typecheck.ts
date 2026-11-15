@@ -22,7 +22,7 @@ const validCheck: CheckRecord = {
 
 const validAdventure: Adventure = {
   schemaVersion: 1,
-  id: 'adventure-1',
+  language: 'en', id: 'adventure-1',
   theme: 'High Fantasy',
   character: {
     name: 'Mira',
@@ -39,6 +39,8 @@ const validAdventure: Adventure = {
     }
   },
   premise: 'A forgotten gate is opening.',
+  mainObjective: 'Discover why the gate is opening.',
+  storyState: { location: 'The gate', situation: 'The road reaches the gate.', currentFocus: null },
   segments: [{
     id: 'segment-1',
     chapterNumber: 1,

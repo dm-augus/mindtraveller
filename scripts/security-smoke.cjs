@@ -18,6 +18,8 @@ app.on('browser-window-created', (_event, window) => {
           .then(() => false, (error) => /segment ID and choice ID/.test(error.message)),
         invalidTurnRejected: await window.mindtraveller.retryTurn(null)
           .then(() => false, (error) => /pending turn ID/.test(error.message)),
+        invalidPreferencesRejected: await window.mindtraveller.saveStoryPreferences({ defaultStoryLanguage: 'fr' })
+          .then(() => false, () => true),
         csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content
       }))()`);
       if (
@@ -25,13 +27,14 @@ app.on('browser-window-created', (_event, window) => {
         result.nodeRequire !== 'undefined' ||
         result.rawIpc !== 'undefined' ||
         JSON.stringify(result.bridgeKeys) !== JSON.stringify([
-          'getAppInfo', 'getProviderSettings', 'quit', 'requestNewStory',
+          'exportHistory', 'getAppInfo', 'getProviderSettings', 'getStoryPreferences', 'listProviderModels', 'quit', 'requestNewStory',
           'resolveNewStory', 'restoreAdventure', 'retryOpening', 'retryTurn', 'saveProviderConfiguration',
-          'setOpenAiKey', 'startOpening', 'submitChoice'
-        ]) ||
+          'saveStoryPreferences', 'setOpenAiKey', 'startOpening', 'submitChoice'
+        ].sort()) ||
         result.version !== app.getVersion() ||
         !result.invalidChoiceRejected ||
         !result.invalidTurnRejected ||
+        !result.invalidPreferencesRejected ||
         !result.csp?.includes("default-src 'none'") ||
         !result.csp?.includes("connect-src 'none'")
       ) {

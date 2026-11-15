@@ -18,8 +18,8 @@ const choices = [
 ];
 
 function adventure() {
-  return {
-    schemaVersion: 1, id: 'adventure-1', theme: 'Horror',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
+    schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
@@ -33,7 +33,7 @@ function adventure() {
 }
 
 function narration(request) {
-  return {
+  return { storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     outcome: request.check.outcome,
     narrative: request.check.outcome === 'success' ? 'The gate gives way.' : 'The gate withstands Mira’s efforts.',
     choices: Array.from({ length: request.choiceTarget }, (_, index) => ({ id: `next-${index}`, text: `Explore path ${index}.` }))
@@ -46,7 +46,7 @@ function provider(handlers = {}) {
   return {
     kind: 'ollama', assessments, narrations,
     summarize: async () => ({ text: 'Mira attempted the gate.', keyFacts: [], unresolvedThreads: ['Find Mira’s sister.'] }),
-    generateOpening: async () => ({ premise: 'A new mystery.', narrative: 'A new road begins.', choices }),
+    generateOpening: async () => ({ mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A new mystery.', narrative: 'A new road begins.', choices }),
     assessAction: async (request) => {
       assessments.push(structuredClone(request));
       return handlers.assess ? handlers.assess(request) : { kind: 'check', difficulty: 'Hard', attribute: 'Strength' };

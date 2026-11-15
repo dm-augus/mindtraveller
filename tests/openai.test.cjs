@@ -87,9 +87,9 @@ test('discovers models and completes all four story requests with the current ke
     seen.push(body);
     const operation = JSON.parse(body.input[1].content).operation;
     const output = {
-      opening: { premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices },
+      opening: { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices },
       assessment: { kind: 'check', difficulty: 'Hard', attribute: 'Strength' },
-      'checked-narration': { outcome: 'success', narrative: 'The gate gives way.', choices },
+      'checked-narration': { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices },
       summary: { text: 'Mira reached the abbey.', keyFacts: ['The gate opened.'], unresolvedThreads: [] }
     }[operation];
     sendText(response, output);
@@ -100,7 +100,7 @@ test('discovers models and completes all four story requests with the current ke
     return secret;
   } }, { fetchImpl: localFetch(address), timeoutMs: 1000 });
   assert.deepEqual(await adapter.listModels(), [{ id: 'story-model', label: 'story-model' }]);
-  assert.deepEqual(await adapter.generateOpening(opening), {
+  assert.deepEqual(await adapter.generateOpening(opening), { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices
   });
   assert.deepEqual(await adapter.assessAction({
@@ -110,7 +110,7 @@ test('discovers models and completes all four story requests with the current ke
   assert.deepEqual(await adapter.narrateCheck({
     modelId: 'story-model', context: 'The gate is locked.', choice, check,
     paragraphTarget: 2, choiceTarget: 3
-  }), { outcome: 'success', narrative: 'The gate gives way.', choices });
+  }), { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices });
   assert.deepEqual(await adapter.summarize({
     modelId: 'story-model', kind: 'chapter', chapterNumber: 1, context: 'Chapter events.'
   }), { text: 'Mira reached the abbey.', keyFacts: ['The gate opened.'], unresolvedThreads: [] });

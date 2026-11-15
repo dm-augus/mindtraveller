@@ -1,5 +1,6 @@
 import { ALLOCATION_BUDGETS, ATTRIBUTE_NAMES, ATTRIBUTE_RANGES } from './rules';
-import type { AllocationMethod, Attributes, Character, Nature, Theme } from './types';
+import type { AllocationMethod, Attributes, Character, Nature, Theme, StoryLanguage } from './types';
+import { isStoryLanguage } from './story-language';
 
 export { ATTRIBUTE_NAMES, ATTRIBUTE_RANGES } from './rules';
 
@@ -11,6 +12,7 @@ export type ValidationResult<T> =
   | { valid: false; errors: string[] };
 
 export interface CharacterSetup {
+  language: StoryLanguage;
   theme: Theme;
   character: Character;
 }
@@ -73,6 +75,8 @@ export function validateCharacterSetup(input: unknown): ValidationResult<Charact
   if (!isRecord(input)) return { valid: false, errors: ['Provide a character setup.'] };
   const errors: string[] = [];
   if (!isOneOf(input.theme, THEMES)) errors.push('Select Horror, Romance, or High Fantasy.');
+  const language = 'language' in input ? input.language : 'en';
+  if (!isStoryLanguage(language)) errors.push('Select English or Português.');
 
   const character = input.character;
   if (!isRecord(character)) return { valid: false, errors: [...errors, 'Provide character details.'] };
@@ -90,6 +94,7 @@ export function validateCharacterSetup(input: unknown): ValidationResult<Charact
     valid: true,
     value: {
       theme: input.theme as Theme,
+      language: language as StoryLanguage,
       character: {
         name,
         gender,

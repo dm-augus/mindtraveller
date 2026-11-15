@@ -20,8 +20,8 @@ const choices = [
 ];
 
 function adventure() {
-  return {
-    schemaVersion: 1, id: 'adventure-1', theme: 'Horror',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
+    schemaVersion: 1, language: 'en', id: 'adventure-1', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
@@ -35,7 +35,7 @@ function adventure() {
 }
 
 function continuation(request) {
-  return { kind: 'no-check', narrative: `Mira decides to ${request.choice.choiceText}\n\nThe abbess greets her.`, choices };
+  return { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: `Mira decides to ${request.choice.choiceText}\n\nThe abbess greets her. Turn ${request.choice.turnId}.`, choices };
 }
 
 function provider(handler) {
@@ -43,7 +43,7 @@ function provider(handler) {
   return {
     kind: 'ollama', requests,
     summarize: async () => ({ text: 'Mira reached the abbey.', keyFacts: [], unresolvedThreads: ['Find Mira’s sister.'] }),
-    generateOpening: async () => ({ premise: 'A new mystery.', narrative: 'A new road begins.', choices }),
+    generateOpening: async () => ({ mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A new mystery.', narrative: 'A new road begins.', choices }),
     assessAction: async (request) => {
       requests.push(structuredClone(request));
       return handler ? handler(request) : continuation(request);
@@ -193,8 +193,8 @@ test('invalid input, unknown choices, and stale retry IDs leave storage untouche
 });
 
 for (const invalid of [
-  { kind: 'no-check', narrative: 'A scene.', choices: [] },
-  { kind: 'no-check', narrative: 'A scene.', choices: [choices[0], choices[0], choices[1]] },
+  { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'A scene.', choices: [] },
+  { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, kind: 'no-check', narrative: 'A scene.', choices: [choices[0], choices[0], choices[1]] },
   { kind: 'check', difficulty: 'Impossible', attribute: 'Strength' }
 ]) {
   test(`malformed ${invalid.kind} assessment preserves the pending choice and prior story`, async (t) => {

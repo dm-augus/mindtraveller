@@ -4,6 +4,7 @@ import type {
   OpeningRequest
 } from '../shared/provider-contract';
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
+import { storyLanguageInstruction } from '../shared/story-language';
 import type { Adventure, Choice, StorySegment } from '../shared/types';
 import { createStoryConfiguration, type StoryConfiguration } from './story-config';
 
@@ -86,6 +87,10 @@ export class StoryContextBuilder {
       return [summary.chapterNumber, boundary?.chapterNumber === summary.chapterNumber ? boundary.index : -1];
     }));
     const context = {
+      mainObjective: adventure.mainObjective,
+      storyState: adventure.storyState,
+      language: adventure.language,
+      languageInstruction: storyLanguageInstruction(adventure.language),
       rules: GAME_RULES_TEXT,
       theme: adventure.theme,
       character: adventure.character,
@@ -100,7 +105,7 @@ export class StoryContextBuilder {
       latestCheck: phase.kind === 'pending-narration' ? phase.check
         : phase.kind === 'pending-assessment' ? null : adventure.segments.at(-1)?.check ?? null
     };
-    // Rules, objectives in global memory, and recent or unsummarized detail take priority.
+    // Explicit objective/state, rules, and recent or unsummarized detail take priority.
     const requiredText = JSON.stringify(context);
     this.requireBudget(requiredText);
     let bytes = Buffer.byteLength(requiredText, 'utf8');
@@ -120,16 +125,17 @@ export class StoryContextBuilder {
     return JSON.stringify(context);
   }
 
-  openingRequest(modelId: string, setup: Pick<Adventure, 'theme' | 'character'>): OpeningRequest {
+  openingRequest(modelId: string, setup: Pick<Adventure, 'theme' | 'character' | 'language'>): OpeningRequest {
     const request: OpeningRequest = {
       modelId,
+      language: setup.language,
       theme: setup.theme,
       character: structuredClone(setup.character),
       rules: GAME_RULES_TEXT,
       paragraphTarget: this.configuration.paragraphTarget,
       choiceTarget: this.configuration.choiceTarget
     };
-    this.requireBudget(JSON.stringify(request));
+    this.requireBudget(JSON.stringify({ ...request, languageInstruction: storyLanguageInstruction(setup.language) }));
     return request;
   }
 
@@ -140,6 +146,8 @@ export class StoryContextBuilder {
     return {
       modelId,
       context: this.build(adventure),
+      recentNarratives: adventure.segments.slice(-6).map(segment => segment.narrative),
+      language: adventure.language,
       choice: { ...adventure.phase.choice },
       attributes: { ...adventure.character.attributes },
       paragraphTarget: this.configuration.paragraphTarget,
@@ -154,8 +162,10 @@ export class StoryContextBuilder {
     return {
       modelId,
       context: this.build(adventure),
+      recentNarratives: adventure.segments.slice(-6).map(segment => segment.narrative),
       choice: { ...adventure.phase.choice },
       check: { ...adventure.phase.check },
+      language: adventure.language,
       paragraphTarget: this.configuration.paragraphTarget,
       choiceTarget: this.configuration.choiceTarget
     };

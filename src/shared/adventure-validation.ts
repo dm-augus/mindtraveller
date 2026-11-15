@@ -2,6 +2,8 @@ import { createCheckRecord, type CheckSelection } from './action-rules';
 import { validateCharacterSetup } from './character-rules';
 import { ATTRIBUTE_NAMES } from './rules';
 import type { Adventure } from './types';
+import { isStoryLanguage } from './story-language';
+import { isStoryState } from './story-memory';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -102,13 +104,16 @@ export function isAdventure(value: unknown): value is Adventure {
   if (!isRecord(character.attributes) || !hasOnlyKeys(character.attributes, ATTRIBUTE_NAMES)) return false;
 
   const validShape = hasOnlyKeys(value, [
-    'schemaVersion', 'id', 'theme', 'character', 'premise', 'segments',
-    'chapterSummaries', 'globalSummary', 'phase', 'updatedAt'
+    'schemaVersion', 'id', 'theme', 'language', 'character', 'premise', 'segments',
+    'chapterSummaries', 'globalSummary', 'phase', 'updatedAt', 'mainObjective', 'storyState'
   ])
     && value.schemaVersion === 1
+    && isStoryLanguage(value.language)
     && isText(value.id)
     && validateCharacterSetup({ theme: value.theme, character: value.character }).valid
     && (value.premise === null || typeof value.premise === 'string')
+    && (value.mainObjective === null || isText(value.mainObjective))
+    && (value.storyState === null || isStoryState(value.storyState))
     && Array.isArray(value.segments)
     && value.segments.every(isSegment)
     && Array.isArray(value.chapterSummaries)
@@ -117,6 +122,9 @@ export function isAdventure(value: unknown): value is Adventure {
     && isPhase(value.phase)
     && isText(value.updatedAt);
   if (!validShape) return false;
+  if ((value.segments as unknown[]).length > 0 && (value.mainObjective === null || value.storyState === null)) {
+    return false;
+  }
 
   const phase = value.phase as Record<string, unknown>;
   if (phase.kind === 'pending-assessment' || phase.kind === 'pending-narration') {

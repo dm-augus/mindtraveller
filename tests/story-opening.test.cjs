@@ -24,7 +24,7 @@ function setup(theme = 'Horror') {
 }
 
 function opening(request) {
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     premise: `${request.character.name} faces a ${request.theme} mystery.`,
     narrative: `${request.character.name} reaches a medieval abbey.\n\nA bell sounds beneath the gate.`,
     choices: Array.from({ length: request.choiceTarget }, (_, index) => ({
@@ -173,7 +173,7 @@ for (const failure of ['timeout', 'malformed']) {
     const store = await storeFixture(t);
     const failed = stub(() => {
       if (failure === 'timeout') throw new ProviderError('ollama', 'request-timeout', 'Retry the opening.');
-      return { premise: 'A mystery.', narrative: 'A scene.', choices: [] };
+      return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A mystery.', narrative: 'A scene.', choices: [] };
     });
     const controller = new StoryController(store, source(failed, 'old-model'));
     await assert.rejects(controller.startOpening(setup()), failure === 'timeout' ? ProviderError : ProviderContractError);

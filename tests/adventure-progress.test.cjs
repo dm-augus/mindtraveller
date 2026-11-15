@@ -14,15 +14,15 @@ async function temporaryUserData(t) {
     if (path.dirname(directory) !== base || !path.basename(directory).startsWith('mindtraveller-progress-')) {
       throw new Error('Refusing to remove a directory outside this test fixture.');
     }
-    await fs.rm(directory, { recursive: true, force: true });
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   });
   return directory;
 }
 
 function adventure() {
-  return {
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
     schemaVersion: 1,
-    id: 'adventure-1',
+    language: 'en', id: 'adventure-1',
     theme: 'Horror',
     character: {
       name: 'Mira',
@@ -73,7 +73,7 @@ function nextSegment(check = null) {
 test('opening and summary pending states survive restart with stable identifiers', async (t) => {
   const userData = await temporaryUserData(t);
   const store = new AdventureStore(userData);
-  const opening = { ...adventure(), segments: [], premise: null,
+  const opening = { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, ...adventure(), segments: [], premise: null,
     phase: { kind: 'pending-opening', turnId: 'opening-1' } };
   await store.save(opening);
   assert.deepEqual(await new AdventureProgress(new AdventureStore(userData)).restore(), opening);
@@ -142,18 +142,18 @@ test('checked turn commits the saved roll once and restores as ready', async (t)
 
   const restarted = new AdventureProgress(new AdventureStore(userData));
   await assert.rejects(
-    restarted.commitTurn(pending.turnId, nextSegment({ ...check, roll: check.roll === 1 ? 2 : 1 })),
+    restarted.commitTurn(pending.turnId, nextSegment({ ...check, roll: check.roll === 1 ? 2 : 1 }), adventure().storyState),
     /saved check result/
   );
   assert.equal((await restarted.restore()).phase.kind, 'pending-narration');
 
-  await restarted.commitTurn(pending.turnId, nextSegment(check));
+  await restarted.commitTurn(pending.turnId, nextSegment(check), adventure().storyState);
   const completed = await new AdventureProgress(new AdventureStore(userData)).restore();
   assert.equal(completed.phase.kind, 'ready');
   assert.equal(completed.segments.length, 2);
   assert.equal(completed.segments[0].selectedChoiceId, 'choice-1');
   assert.deepEqual(completed.segments[1].check, check);
-  await assert.rejects(restarted.commitTurn(pending.turnId, nextSegment(check)), /No matching turn/);
+  await assert.rejects(restarted.commitTurn(pending.turnId, nextSegment(check), adventure().storyState), /No matching turn/);
   assert.equal((await restarted.restore()).segments.length, 2);
 });
 
@@ -162,7 +162,7 @@ test('no-check turn commits and restores without a roll or duplicate choice', as
   await new AdventureStore(userData).save(adventure());
   const pending = await new AdventureProgress(new AdventureStore(userData)).selectChoice('choice-2');
   const restarted = new AdventureProgress(new AdventureStore(userData));
-  const completed = await restarted.commitTurn(pending.turnId, nextSegment());
+  const completed = await restarted.commitTurn(pending.turnId, nextSegment(), adventure().storyState);
   assert.equal(completed.segments.length, 2);
   assert.equal(completed.segments[0].selectedChoiceId, 'choice-2');
   assert.equal(completed.segments[1].check, null);

@@ -3,6 +3,8 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { isAdventure } from '../shared/adventure-validation';
 import type { Adventure } from '../shared/types';
+import { isStoryLanguage } from '../shared/story-language';
+import { isStoryState, normalizeStoryMemory } from '../shared/story-memory';
 
 export interface AdventureFileOps {
   mkdir(filePath: string, options: { recursive: true }): Promise<string | undefined>;
@@ -25,6 +27,12 @@ function isMissingFile(error: unknown): boolean {
 function parseDocument(text: string): Adventure | null {
   try {
     const value: unknown = JSON.parse(text);
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && !('language' in value)) {
+      Object.assign(value, { language: 'en' });
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      normalizeStoryMemory(value as Record<string, unknown>);
+    }
     return isAdventure(value) ? value : null;
   } catch {
     return null;
@@ -46,11 +54,19 @@ function isDiscardMarker(text: string): boolean {
 }
 
 function serializeAdventure(adventure: Adventure): string {
+  if (('mainObjective' in adventure && adventure.mainObjective !== null
+      && (typeof adventure.mainObjective !== 'string' || !adventure.mainObjective.trim()))
+    || ('storyState' in adventure && adventure.storyState !== null && !isStoryState(adventure.storyState))) {
+    throw new TypeError('Adventure does not match save schema version 1.');
+  }
+  if ('language' in adventure && !isStoryLanguage(adventure.language)) {
+    throw new TypeError('Adventure does not match save schema version 1.');
+  }
   const text = JSON.stringify(adventure);
   if (typeof text !== 'string' || parseDocument(text) === null) {
     throw new TypeError('Adventure does not match save schema version 1.');
   }
-  return `${text}\n`;
+  return `${JSON.stringify(parseDocument(text))}\n`;
 }
 
 export class AdventureStore {
@@ -108,7 +124,8 @@ export class AdventureStore {
   }
 
   async saveIfUnchanged(expected: Adventure | null, adventure: Adventure): Promise<void> {
-    const snapshot = structuredClone(expected);
+    const snapshot = expected === null ? null : parseDocument(JSON.stringify(expected));
+    if (expected !== null && snapshot === null) throw new TypeError('Invalid expected adventure.');
     const text = serializeAdventure(adventure);
     // Check and replace inside the same queue used by saves and New Story discard.
     const write = this.writes.catch(() => undefined).then(async () => {

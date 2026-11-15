@@ -5,6 +5,7 @@ import {
   type SummaryResponse
 } from '../shared/provider-contract';
 import { GAME_RULES_TEXT } from '../shared/rules-reference';
+import { storyLanguageInstruction } from '../shared/story-language';
 import type { Adventure, ChapterSummary, StorySegment } from '../shared/types';
 import { createStoryConfiguration, type StoryConfiguration } from './story-config';
 import { contextEvents, estimateContextTokens, selectedChoice, StoryContextBudgetError, StoryContextBuilder } from './story-context';
@@ -107,6 +108,10 @@ export class StorySummarizer {
       const first = staged.segments.findIndex((segment) => segment.id === source.unsummarized[0].id);
       const precedingSegment = staged.segments[first - 1];
       const context = JSON.stringify({
+        mainObjective: staged.mainObjective,
+        storyState: staged.storyState,
+        language: staged.language,
+        languageInstruction: storyLanguageInstruction(staged.language),
         rules: GAME_RULES_TEXT,
         theme: staged.theme,
         character: staged.character,
@@ -122,7 +127,7 @@ export class StorySummarizer {
         throw new StoryContextBudgetError(estimatedTokens, this.configuration.contextBudgetTokens);
       }
       const summary = parseSummaryResponse(await generate({
-        kind: 'chapter', chapterNumber, context
+        kind: 'chapter', language: staged.language, chapterNumber, context
       }));
       const next: ChapterSummary = {
         chapterNumber,
@@ -135,7 +140,7 @@ export class StorySummarizer {
     }
 
     const global = parseSummaryResponse(await generate({
-      kind: 'global', context: new StoryContextBuilder(this.configuration)
+      kind: 'global', language: staged.language, context: new StoryContextBuilder(this.configuration)
         .build(staged, { requiredChapterNumbers: due })
     }));
     staged.globalSummary = summaryText(global);

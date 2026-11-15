@@ -1,4 +1,7 @@
 export type Theme = 'Horror' | 'Romance' | 'High Fantasy';
+export type StoryLanguage = 'en' | 'pt-BR';
+export interface StoryPreferences { defaultStoryLanguage: StoryLanguage }
+export type HistoryExportResult = { kind: 'cancelled' } | { kind: 'saved'; filePath: string };
 export type Nature = 'Good' | 'Neutral' | 'Bad';
 export type AllocationMethod = 'Balanced' | 'Simplified';
 
@@ -54,6 +57,12 @@ export interface ChapterSummary {
   text: string;
 }
 
+export interface StoryState {
+  location: string | null;
+  situation: string;
+  currentFocus: string | null;
+}
+
 export interface PendingChoice {
   turnId: string;
   choiceId: string;
@@ -71,11 +80,14 @@ export type AdventurePhase =
   | { kind: 'pending-summary'; turnId: string; chapterNumber: number };
 
 export interface Adventure {
+  language: StoryLanguage;
   schemaVersion: 1;
   id: string;
   theme: Theme;
   character: Character;
   premise: string | null;
+  mainObjective: string | null;
+  storyState: StoryState | null;
   segments: StorySegment[];
   chapterSummaries: ChapterSummary[];
   globalSummary: string;

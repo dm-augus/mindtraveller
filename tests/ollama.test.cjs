@@ -77,9 +77,9 @@ test('local stub covers model discovery and all four story operations', async (t
     seen.push(body);
     const input = JSON.parse(body.messages[1].content);
     const content = {
-      opening: { premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices },
+      opening: { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices },
       assessment: { kind: 'check', difficulty: 'Hard', attribute: 'Strength' },
-      'checked-narration': { outcome: 'success', narrative: 'The gate gives way.', choices },
+      'checked-narration': { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices },
       summary: { text: 'Mira reached the abbey.', keyFacts: ['The gate opened.'], unresolvedThreads: [] }
     }[input.operation];
     sendJson(response, 200, {
@@ -93,7 +93,7 @@ test('local stub covers model discovery and all four story operations', async (t
   assert.deepEqual(await adapter.generateOpening({
     modelId: 'story-model', theme: 'Horror', character, rules: 'D100 rules',
     paragraphTarget: 2, choiceTarget: 3
-  }), { premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices });
+  }), { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A bell wakes the abbey.', narrative: 'The road reaches the gate.', choices });
   assert.deepEqual(await adapter.assessAction({
     modelId: 'story-model', context: 'The gate is locked.', choice: pendingChoice,
     attributes: character.attributes, paragraphTarget: 2, choiceTarget: 3
@@ -101,19 +101,20 @@ test('local stub covers model discovery and all four story operations', async (t
   assert.deepEqual(await adapter.narrateCheck({
     modelId: 'story-model', context: 'The gate is locked.', choice: pendingChoice,
     check, paragraphTarget: 2, choiceTarget: 3
-  }), { outcome: 'success', narrative: 'The gate gives way.', choices });
+  }), { storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices });
   assert.deepEqual(await adapter.summarize({
     modelId: 'story-model', kind: 'chapter', chapterNumber: 1, context: 'Chapter events.'
   }), { text: 'Mira reached the abbey.', keyFacts: ['The gate opened.'], unresolvedThreads: [] });
 
   assert.equal(seen.length, 4);
   for (const call of seen) {
+    assert.deepEqual(call.options, { num_ctx: 8192, num_predict: 1536 });
     assert.equal(call.model, 'story-model');
     assert.equal(call.stream, false);
     assert.equal(typeof call.format, 'object');
     assert.deepEqual(call.messages.map((message) => message.role), ['system', 'user']);
   }
-  assert.deepEqual(seen[0].format.required, ['premise', 'narrative', 'choices']);
+  assert.deepEqual(seen[0].format.required, ['premise', 'narrative', 'choices', 'mainObjective', 'storyState']);
   assert.equal(seen[0].format.additionalProperties, false);
   assert.equal(seen[0].format.properties.choices.minItems, 3);
   assert.equal(seen[0].format.properties.choices.maxItems, 3);

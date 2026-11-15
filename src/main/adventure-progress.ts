@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { rollCheck } from './action-resolution';
-import type { Adventure, CheckRecord, PendingChoice, StorySegment } from '../shared/types';
+import type { Adventure, CheckRecord, PendingChoice, StorySegment, StoryState } from '../shared/types';
+import { isStoryState } from '../shared/story-memory';
 import type { AdventureStore } from './adventure-storage';
 
 function sameCheck(left: CheckRecord | null, right: CheckRecord): boolean {
@@ -104,10 +105,11 @@ export class AdventureProgress {
     });
   }
 
-  commitTurn(turnId: string, segment: StorySegment, summaryChapterNumber?: number): Promise<Adventure> {
+  commitTurn(turnId: string, segment: StorySegment, storyState: StoryState, summaryChapterNumber?: number): Promise<Adventure> {
     return this.runExclusive(async () => {
       const adventure = await this.requireAdventure();
       const phase = adventure.phase;
+      if (!isStoryState(storyState)) throw new TypeError('A completed turn requires valid story state.');
       if ((phase.kind !== 'pending-assessment' && phase.kind !== 'pending-narration')
         || phase.choice.turnId !== turnId) {
         throw new Error('No matching turn awaits completion.');
@@ -134,6 +136,7 @@ export class AdventureProgress {
       const next: Adventure = {
         ...adventure,
         segments: [...adventure.segments, segment],
+        storyState: structuredClone(storyState),
         phase: summaryChapterNumber === undefined ? { kind: 'ready' }
           : { kind: 'pending-summary', turnId, chapterNumber: summaryChapterNumber },
         updatedAt: new Date().toISOString()

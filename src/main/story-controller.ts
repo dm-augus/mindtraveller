@@ -6,13 +6,14 @@ import {
   parseModelSelection,
   parseOpeningResponse
 } from '../shared/provider-contract';
-import type { Adventure, AdventurePhase, Choice, ChoiceTurnResult, StorySegment } from '../shared/types';
+import type { Adventure, AdventurePhase, Choice, ChoiceTurnResult, StorySegment, StoryState } from '../shared/types';
 import { AdventureProgress } from './adventure-progress';
 import type { AdventureStore } from './adventure-storage';
 import type { SelectedStoryProvider, StoryProviderSource } from './providers/active-provider';
 import type { StoryConfiguration } from './story-config';
 import { StoryContextBuilder } from './story-context';
 import { StorySummarizer } from './story-summarizer';
+import { assertFreshNarrative } from './providers/story-continuation';
 
 export class StoryController {
   private generationInFlight = false;
@@ -55,8 +56,11 @@ export class StoryController {
         schemaVersion: 1,
         id: randomUUID(),
         theme: setup.value.theme,
+        language: setup.value.language,
         character: setup.value.character,
         premise: null,
+        mainObjective: null,
+        storyState: null,
         segments: [],
         chapterSummaries: [],
         globalSummary: '',
@@ -134,11 +138,12 @@ export class StoryController {
 
   private async commitContinuation(
     pending: Adventure,
-    response: { narrative: string; choices: Choice[] }
+    response: { narrative: string; choices: Choice[]; storyState: StoryState }
   ): Promise<ChoiceTurnResult> {
     if (pending.phase.kind !== 'pending-assessment' && pending.phase.kind !== 'pending-narration') {
       throw new Error('No matching turn awaits completion.');
     }
+    assertFreshNarrative(response.narrative, pending.segments.slice(-6).map(segment => segment.narrative));
     const createdAt = new Date().toISOString();
     const segment: StorySegment = {
       id: pending.phase.choice.turnId,
@@ -149,9 +154,10 @@ export class StoryController {
       check: pending.phase.kind === 'pending-narration' ? pending.phase.check : null,
       createdAt
     };
-    const preview: Adventure = { ...pending, segments: [...pending.segments, segment], phase: { kind: 'ready' } };
+    const preview: Adventure = { ...pending, storyState: response.storyState,
+      segments: [...pending.segments, segment], phase: { kind: 'ready' } };
     const chapterNumber = this.summaries.chaptersDue(preview)[0];
-    const completed = await this.progress.commitTurn(pending.phase.choice.turnId, segment, chapterNumber);
+    const completed = await this.progress.commitTurn(pending.phase.choice.turnId, segment, response.storyState, chapterNumber);
     return { kind: 'continued', adventure: await this.finishSummaries(completed) };
   }
 
@@ -194,6 +200,8 @@ export class StoryController {
     const completed: Adventure = {
       ...pending,
       premise: response.premise,
+      mainObjective: response.mainObjective,
+      storyState: response.storyState,
       segments: [{
         id: pending.phase.turnId,
         chapterNumber: 1,

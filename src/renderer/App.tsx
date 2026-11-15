@@ -11,6 +11,7 @@ import settingsIcon from '../assets/icons/settings_transparent.png';
 import quitIcon from '../assets/icons/quit_transparent.png';
 import bookIcon from '../assets/icons/status_book_transparent.png';
 import choiceArrow from '../assets/icons/choice_arrow_transparent.png';
+import { LANGUAGE_LABELS } from '../shared/story-language';
 
 type View = 'story' | 'new-story' | 'rules' | 'settings';
 const NAVIGATION = [
@@ -100,6 +101,9 @@ export function App(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [operation, setOperation] = useState('');
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState('');
+  const exportInFlight = useRef(false);
   const [confirmation, setConfirmation] = useState<Extract<NewStoryRequest, { kind: 'confirmation-required' }> | null>(null);
   const [confirmationBusy, setConfirmationBusy] = useState(false);
   const inFlight = useRef(false);
@@ -115,7 +119,9 @@ export function App(): React.JSX.Element {
       : adventure.phase.kind === 'pending-narration'
         ? panel?.querySelector('.pending-story .check-result')
         : panel?.querySelector('.pending-story');
-    target?.scrollIntoView({ block: 'start' });
+    if (panel && target) {
+      panel.scrollTo({ top: panel.scrollTop + target.getBoundingClientRect().top - panel.getBoundingClientRect().top });
+    }
   }, [adventure?.segments.length, adventure?.phase.kind, view]);
   useEffect(() => {
     let active = true;
@@ -133,10 +139,11 @@ export function App(): React.JSX.Element {
   }, []);
 
   async function runOperation(action: () => Promise<Adventure>, label: string): Promise<void> {
-    if (inFlight.current) return;
+    if (inFlight.current || exportInFlight.current) return;
     inFlight.current = true;
     setOperation(label);
     setError('');
+    setExportFeedback('');
     try { setAdventure(await action()); }
     catch (failure) {
       setError(failure instanceof Error ? failure.message : 'The story could not continue. Try again.');
@@ -161,7 +168,7 @@ export function App(): React.JSX.Element {
   }
 
   async function requestNewStory(): Promise<void> {
-    if (inFlight.current || loading || confirmationBusy || confirmation) return;
+    if (inFlight.current || exportInFlight.current || loading || confirmationBusy || confirmation) return;
     setConfirmationBusy(true); setError('');
     try {
       const request = await window.mindtraveller.requestNewStory();
@@ -198,21 +205,35 @@ export function App(): React.JSX.Element {
     catch { setError('Unable to close the application. Try Quit again.'); }
   }
 
+  async function exportHistory(): Promise<void> {
+    if (inFlight.current || exportInFlight.current || loading || confirmationBusy || confirmation || !adventure?.segments.length) return;
+    exportInFlight.current = true; setExporting(true); setExportFeedback(''); setError('');
+    try {
+      const result = await window.mindtraveller.exportHistory();
+      if (result.kind === 'saved') setExportFeedback(`History exported to ${result.filePath}`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Unable to export history. Try another destination.');
+    } finally { exportInFlight.current = false; setExporting(false); }
+  }
+
   const current = adventure?.segments.at(-1);
   const pending = adventure !== null && adventure.phase.kind !== 'ready';
-  const busy = loading || Boolean(operation) || confirmationBusy;
+  const busy = loading || Boolean(operation) || confirmationBusy || exporting;
+  const exportReason = !adventure?.segments.length ? 'No saved story history to export.'
+    : confirmation ? 'Finish the New Story confirmation first.'
+      : busy ? 'Wait for the current operation to finish.' : 'Save the complete story as Markdown.';
   const providerLabel = settings ? (settings.activeProvider === 'ollama' ? 'Ollama' : 'OpenAI') : 'Storyteller';
   const model = settings?.[settings.activeProvider].modelId;
   return (
     <main className="app-shell" data-current-view={view} data-loading={loading} aria-busy={busy}>
-      <header className="titlebar"><h1>Mindtraveller</h1><span className="titlebar-context">{adventure?.theme ?? 'A world of your own'}</span></header>
       <div className="workspace">
         <aside className="sidebar">
+          <h1 className="sidebar-brand">Mindtraveller</h1>
           <div className="branding-frame"><img className="dice-artwork" src={diceArtwork} alt="A twenty-sided die surrounded by violet flames" /></div>
           <nav className="main-navigation" aria-label="Main navigation">{NAVIGATION.map((item) => (
             <button key={item.view} className={`retro-button nav-button${view === item.view ? ' is-selected' : ''}`}
               aria-current={view === item.view ? 'page' : undefined} data-view={item.view}
-              disabled={item.view === 'new-story' && busy}
+              disabled={exporting || (item.view === 'new-story' && busy)}
               onClick={() => { if (item.view === 'new-story') void requestNewStory(); else setView(item.view); }}>
               <img src={item.icon} alt="" /><span>{item.label}</span>
             </button>
@@ -226,9 +247,17 @@ export function App(): React.JSX.Element {
           <section className="story-panel inset-panel" aria-labelledby="view-title">
             <div className="section-header"><h2 id="view-title">{VIEW_TITLES[view]}</h2>
               {view !== 'story' && <button className="return-story" data-action="return-story" onClick={() => setView('story')}>Return to story</button>}
-              {view === 'story' && current && <span className="chapter-label">Chapter {current.chapterNumber}</span>}</div>
+              {view === 'story' && <div className="story-tools">
+              {adventure && <span className="chapter-label" aria-label="Adventure language">
+                <span className="story-genre">{adventure.theme}</span>
+                {current && <span>Chapter {current.chapterNumber}</span>}<span>{LANGUAGE_LABELS[adventure.language]}</span></span>}
+              <button className="return-story export-history" type="button" data-action="export-history"
+                disabled={busy || Boolean(confirmation) || !adventure?.segments.length} title={exportReason}
+                onClick={() => { void exportHistory(); }}>{exporting ? 'Exporting…' : 'Export History'}</button>
+              </div>}</div>
             {error && !(view === 'story' && adventure?.phase.kind === 'pending-opening') &&
               <div className="error-banner" role="alert">{error}</div>}
+            {exportFeedback && <div className="export-feedback" role="status">{exportFeedback}</div>}
             <div className="story-scroll" ref={storyScroll} tabIndex={0} aria-label={VIEW_TITLES[view]}>
               {view === 'story' && <StoryContent adventure={adventure} onNewStory={() => { void requestNewStory(); }} />}
               {view === 'new-story' && <NewStorySetup busy={busy} onStart={startStory} />}

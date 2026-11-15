@@ -21,30 +21,34 @@ const check: CheckRecord = {
 };
 const selection: ModelSelection = { provider: 'ollama', modelId: 'local-story' };
 const opening: OpeningRequest = {
-  modelId: selection.modelId, theme: 'Horror', character, rules: 'D100 rules',
+  language: 'en', modelId: selection.modelId, theme: 'Horror', character, rules: 'D100 rules',
   paragraphTarget: 2, choiceTarget: 3
 };
 const assessment: ActionAssessmentRequest = {
-  modelId: selection.modelId, context: 'Current story', choice,
+  language: 'en', modelId: selection.modelId, context: 'Current story', choice,
   attributes: character.attributes,
   paragraphTarget: 2, choiceTarget: 3
 };
 const narration: CheckedNarrationRequest = { ...assessment, check };
 const chapterSummary: SummaryRequest = {
-  modelId: selection.modelId, kind: 'chapter', chapterNumber: 1, context: 'Chapter events'
+  language: 'en', modelId: selection.modelId, kind: 'chapter', chapterNumber: 1, context: 'Chapter events'
 };
 const globalSummary: SummaryRequest = {
-  modelId: selection.modelId, kind: 'global', context: 'Chapter summaries'
+  language: 'en', modelId: selection.modelId, kind: 'global', context: 'Chapter summaries'
 };
+// @ts-expect-error Every generation operation requires an adventure language.
+const missingLanguage: SummaryRequest = { modelId: 'model', kind: 'global', context: 'Memory' };
+// @ts-expect-error Unsupported story languages cannot enter provider requests.
+const unsupportedLanguage: OpeningRequest = { ...opening, language: 'fr' };
 
 const provider: StoryProvider = {
   kind: 'ollama',
   listModels: async () => [{ id: 'local-story', label: 'Local Story' }],
-  generateOpening: async () => ({ premise: 'A bell rings.', narrative: 'The gate opens.', choices }),
+  generateOpening: async () => ({ mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, premise: 'A bell rings.', narrative: 'The gate opens.', choices }),
   assessAction: async (): Promise<ActionAssessmentResponse> => ({
     kind: 'check', difficulty: 'Hard', attribute: 'Strength'
   }),
-  narrateCheck: async () => ({ outcome: 'success', narrative: 'The gate gives way.', choices }),
+  narrateCheck: async () => ({ storyState: { location: null, situation: 'At the current scene.', currentFocus: null }, outcome: 'success', narrative: 'The gate gives way.', choices }),
   summarize: async () => ({ text: 'The gate opened.', keyFacts: [], unresolvedThreads: [] })
 };
 

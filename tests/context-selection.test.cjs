@@ -28,8 +28,8 @@ function adventure(chapters = 60) {
       text: `Chapter ${chapter} developments. ${'Mira helped the abbess and learned about the sealed crypt. '.repeat(8)}`
     });
   }
-  return {
-    schemaVersion: 1, id: 'long-adventure', theme: 'Horror',
+  return { mainObjective: 'Find the cause of the disturbance.', storyState: { location: null, situation: 'At the current scene.', currentFocus: null },
+    schemaVersion: 1, language: 'en', id: 'long-adventure', theme: 'Horror',
     character: {
       name: 'Mira', gender: 'Woman', nature: 'Good', allocationMethod: 'Balanced',
       attributes: { Strength: 1, Dexterity: 1, Intelligence: 2, Endurance: 1, Charisma: -1, Luck: -1 }
